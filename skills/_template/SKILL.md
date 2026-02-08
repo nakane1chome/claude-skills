@@ -8,7 +8,7 @@ description: >
 # allowed-tools: Read, Grep, Glob  # uncomment to restrict tool access
 # context: fork                    # uncomment to run in an isolated subagent
 # agent: Explore                   # subagent type (when context: fork)
-# argument-hint: [filename]        # shown during autocomplete
+argument-hint: <file|folder>...     # shown during autocomplete; update to match your skill
 ---
 
 > Key philosophy or concern for this skill (optional).

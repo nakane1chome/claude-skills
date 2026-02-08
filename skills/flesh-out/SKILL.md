@@ -1,9 +1,10 @@
 ---
 name: flesh-out
 description: Transform raw/crude document drafts into structured content. Use when a document is a skeleton of ideas, notes, or stream-of-consciousness that needs generative expansion rather than review polish.
+argument-hint: <file|folder>...
 ---
 
-This skill is for **generative** work on crude/raw content - not polishing drafts.
+This skill is for **generative** work on crude/raw content at `$ARGUMENTS` - not polishing drafts.
 
 **Stop after each stage and have changes reviewed with user.**
 

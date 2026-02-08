@@ -1,51 +1,58 @@
 ---
 name: strong-edit
 description: Critical editorial analysis of articles. Examines structure, argument strength, relevance, and readability. Use for substantive editing - challenging what's said and how, not just polish.
+argument-hint: <file|folder>...
 ---
 
-This skill is for **critical evaluation** - not polish (review-steps) or generation (flesh-out).
+This skill is for **critical evaluation** of `$ARGUMENTS` - not polish (review-steps) or generation (flesh-out).
 
 **Stop after each stage and have changes reviewed with user.**
 
-> **Note**: Strong editing challenges the content itself. The agent identifies weaknesses; the developer decides what to change.
+> **Note**: Strong editing challenges the content itself. The agent identifies weaknesses; the developer decides what to change. Stages 0-4 are **critique only** — no edits are made to the document. Edits happen in Stage 5 after the critique is complete.
+>
+> See `responsibilities.md` for the full agent/developer ownership matrix.
 
 
 0. **Read and identify the core argument** (developer confirms)
    - What is this article trying to say?
    - Who is the intended audience?
    - What action or understanding should readers have afterward?
-   - Confirm understanding before proceeding - critique requires understanding intent
+   - Confirm understanding before proceeding — critique requires understanding intent
 
-1. **Evaluate structure** (agent leads)
+1. **Evaluate structure** (agent critiques, developer discusses)
    - Does the opening hook the reader and state the thesis?
    - Does each section serve the argument?
    - Is the logical flow sound? (premise -> evidence -> conclusion)
    - Are there structural gaps or non-sequiturs?
    - Is the conclusion earned by what precedes it?
-   - Propose restructuring if needed
+   - Present findings and ask the developer which structural issues matter most before moving on
 
-2. **Assess relevance and focus** (agent leads)
+2. **Assess relevance and focus** (agent critiques, developer discusses)
    - Does every paragraph serve the core argument?
    - Identify tangents, digressions, or scope creep
    - Flag content that weakens the piece by diluting focus
    - Identify missing content that would strengthen the argument
-   - Recommend cuts (be specific - quote what should go)
+   - Recommend cuts (be specific — quote what should go)
+   - Ask: which of these cuts does the developer agree with? Is anything flagged actually intentional?
 
-3. **Challenge the argument** (agent leads)
+3. **Challenge the argument** (agent critiques, developer discusses)
    - Are claims supported by evidence?
    - Are there logical fallacies or unsupported leaps?
    - What would a skeptical reader question?
    - Are counterarguments acknowledged where needed?
    - Is the argument differentiated from obvious alternatives?
+   - Ask: does the developer have evidence or context that addresses these challenges?
 
-4. **Evaluate readability** (agent leads)
+4. **Evaluate readability** (agent critiques, developer discusses)
    - Is the complexity appropriate for the audience?
    - Are sentences and paragraphs appropriately sized?
    - Is jargon explained or should it be avoided?
    - Does the piece maintain momentum or does it drag?
    - Are transitions clear?
+   - Ask: are there readability choices that are deliberate (e.g. technical jargon for an expert audience)?
 
-5. **Strengthen weak sections** (agent proposes, developer approves)
+5. **Strengthen weak sections** (agent proposes edits, developer approves)
+   - Based on the agreed critique from stages 1-4, now edit the document
    - Rewrite sections that aren't working
    - Tighten verbose passages
    - Sharpen vague statements into concrete claims
@@ -65,6 +72,7 @@ This skill is for **critical evaluation** - not polish (review-steps) or generat
 | Draft with typos, incomplete sentences | **review-steps** |
 | Complete draft needing critical evaluation | **strong-edit** |
 | Polished draft, final check | **review-steps** |
+| Finalized document needs agent-friendly restructuring | **agent-optimize** |
 
 ## Key Differences
 

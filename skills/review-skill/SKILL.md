@@ -6,6 +6,7 @@ description: >
   skill and want to check it before committing, or when evaluating an existing
   skill for improvements.
 allowed-tools: Read, Glob, Grep, Edit, Write
+argument-hint: <skill-dir>...
 ---
 
 This skill reviews and fixes other skills — identifying issues and applying corrections with developer approval at each stage.
