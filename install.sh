@@ -11,7 +11,7 @@ if [[ ! -d "$SKILLS_SRC" ]]; then
 fi
 
 # Discover available skills
-mapfile -t SKILLS < <(find "$SKILLS_SRC" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+mapfile -t SKILLS < <(find "$SKILLS_SRC" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | grep -v '^_' | sort)
 
 if [[ ${#SKILLS[@]} -eq 0 ]]; then
   echo "Error: no skills found in $SKILLS_SRC" >&2

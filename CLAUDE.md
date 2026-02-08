@@ -21,6 +21,7 @@ Each skill lives in `skills/<skill-name>/` and contains:
 | **strong-edit** | Critical editorial analysis | Complete draft needing substantive critique |
 | **agent-optimize** | Optimize docs for AI agent consumption | Verbose prose that agents will need to parse |
 | **sdlc-cross-review** | Completeness + parent document consistency | Document that needs checking against its SDLC hierarchy |
+| **review-skill** | Review a SKILL.md for quality and conventions | New or existing skill that needs checking before use |
 
 ## Conventions
 
