@@ -131,7 +131,7 @@ The current branch is: !`git branch --show-current`
 Files in scope: !`ls src/`
 ```
 
-The shell command runs first; its output replaces the `` !`command` `` expression in the prompt text.
+The shell command runs first; its output replaces the exclamation-mark backtick expression in the prompt text.
 
 ## Supporting Files
 

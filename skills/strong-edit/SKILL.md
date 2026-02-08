@@ -16,7 +16,7 @@ This skill is for **critical evaluation** - not polish (review-steps) or generat
    - What action or understanding should readers have afterward?
    - Confirm understanding before proceeding - critique requires understanding intent
 
-1. **Evaluate structure**
+1. **Evaluate structure** (agent leads)
    - Does the opening hook the reader and state the thesis?
    - Does each section serve the argument?
    - Is the logical flow sound? (premise -> evidence -> conclusion)
@@ -24,21 +24,21 @@ This skill is for **critical evaluation** - not polish (review-steps) or generat
    - Is the conclusion earned by what precedes it?
    - Propose restructuring if needed
 
-2. **Assess relevance and focus**
+2. **Assess relevance and focus** (agent leads)
    - Does every paragraph serve the core argument?
    - Identify tangents, digressions, or scope creep
    - Flag content that weakens the piece by diluting focus
    - Identify missing content that would strengthen the argument
    - Recommend cuts (be specific - quote what should go)
 
-3. **Challenge the argument**
+3. **Challenge the argument** (agent leads)
    - Are claims supported by evidence?
    - Are there logical fallacies or unsupported leaps?
    - What would a skeptical reader question?
    - Are counterarguments acknowledged where needed?
    - Is the argument differentiated from obvious alternatives?
 
-4. **Evaluate readability**
+4. **Evaluate readability** (agent leads)
    - Is the complexity appropriate for the audience?
    - Are sentences and paragraphs appropriately sized?
    - Is jargon explained or should it be avoided?
@@ -51,7 +51,7 @@ This skill is for **critical evaluation** - not polish (review-steps) or generat
    - Sharpen vague statements into concrete claims
    - Replace weak examples with stronger ones
 
-6. **Final assessment**
+6. **Final assessment** (agent leads)
    - Does the piece achieve its stated purpose?
    - What's the single biggest remaining weakness?
    - Recommendation: publish / revise further / rethink approach

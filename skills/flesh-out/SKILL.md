@@ -8,6 +8,8 @@ This skill is for **generative** work on crude/raw content - not polishing draft
 **Stop after each stage and have changes reviewed with user.**
 
 > **Note**: The developer's raw content captures intent. The agent expands and structures but must preserve the developer's meaning. When uncertain about intent, ask - don't assume.
+>
+> See `responsibilities.md` for the full agent/developer ownership matrix.
 
 
 0. **Extract core ideas** (developer leads)
@@ -17,25 +19,26 @@ This skill is for **generative** work on crude/raw content - not polishing draft
    - Identify gaps: "You mention X but don't explain Y - should I research this?"
 
 1. **Research and expand** (agent leads with approval)
-   - Web search for concepts mentioned
+   - Web search for external concepts if applicable
    - Find industry terminology for rough ideas
    - Identify related work the developer may want to reference
    - Propose expansions - developer approves what to include
 
-2. **Structure the content**
+2. **Structure the content** (agent leads with approval)
    - Determine appropriate document structure (based on template if available)
    - Organize ideas into logical sections
    - Create hierarchy (headers, sub-sections)
    - Add diagrams or tables where relationships exist
 
-3. **Polish language**
+3. **Polish language** (agent leads with approval)
    - Fix spelling, grammar, terminology
    - Expand acronyms on first use
    - Ensure consistent usage throughout
    - Add links to external references
 
-4. **Tidy up**
-   - Check with the user where to update the glossary - Add terms that needed clarification
+4. **Tidy up** (agent leads with approval)
+   - Check with the user where to update the glossary
+   - Add terms that needed clarification
    - Update references with new links
 
 ## When to Use This vs Other Skills

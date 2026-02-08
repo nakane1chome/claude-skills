@@ -32,4 +32,5 @@ When doing a review, if there is no other guidance for a project then follow the
 5. **Tidy Up**
 
    - When referring to 3rd party tools and concepts, add markup links directly in the text.
-   - Check with the user where to update the glossary - Add terms that needed clarification
+   - Check with the user where to update the glossary
+   - Add terms that needed clarification
