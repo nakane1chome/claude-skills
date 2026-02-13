@@ -51,6 +51,16 @@ This skill is for **polishing** existing documents at `$ARGUMENTS` — not gener
    - Check with the user where to update the glossary
    - Add terms that needed clarification
 
+6. **Verify links and claims** (agent leads, developer approves)
+   - Extract every URL in the document (inline links, reference links, raw URLs)
+   - Fetch each URL and confirm it resolves (200, not 404/domain-not-found)
+   - For each agent-sourced reference (added in Stages 4 or 5), verify the linked page supports the claim made in the document
+   - Flag any URL that fails or any claim that doesn't match its source
+   - Present a verification table: URL | status | source (human/agent) | notes
+   - Developer decides what to fix, replace, or remove
+
+> **Why this stage exists**: Agent-sourced references can be fabricated. A hallucinated URL with a plausible domain name will survive every other stage because reviewers (human and agent) evaluate structure, argument, and voice, not link targets. Verification must be an explicit step, not assumed.
+
 ## Pipeline Position
 
 This skill sits in the middle of the composition pipeline: **flesh-out** -> **review-steps** -> **strong-edit** -> **agent-optimize**. Use it after a document has structure, before it needs critical evaluation.

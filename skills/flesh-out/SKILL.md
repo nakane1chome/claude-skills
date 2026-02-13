@@ -24,6 +24,7 @@ This skill is for **generative** work on crude/raw content at `$ARGUMENTS` - not
    - Find industry terminology for rough ideas
    - Identify related work the developer may want to reference
    - Propose expansions - developer approves what to include
+   - **Verify every reference before presenting**: fetch URLs, confirm they resolve, confirm the source supports the claim. Do not present unverified links to the developer.
 
 2. **Structure the content** (agent leads with approval)
    - Determine appropriate document structure (based on template if available)
@@ -35,7 +36,7 @@ This skill is for **generative** work on crude/raw content at `$ARGUMENTS` - not
    - Fix spelling, grammar, terminology
    - Expand acronyms on first use
    - Ensure consistent usage throughout
-   - Add links to external references
+   - Add links to external references (verify each URL resolves before adding)
 
 4. **Tidy up** (agent leads with approval)
    - Check with the user where to update the glossary

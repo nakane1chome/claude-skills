@@ -11,6 +11,7 @@ This skill uses a human-in-the-loop approach. Research shows this achieves highe
 | 3. Relevant structure | **Leads** | Approves | Agent checks compliance; human judges exceptions |
 | 4. Industry best practice | Assists | **Leads** | Agent researches; human judges relevance and fit |
 | 5. Tidy up | **Leads** | Approves | Agent executes; human approves final updates |
+| 6. Verify links & claims | **Leads** | Approves | Agent fetches URLs, checks sources; human decides action on failures |
 
 ## Agent Responsibilities
 
@@ -40,6 +41,7 @@ This skill uses a human-in-the-loop approach. Research shows this achieves highe
 - Cannot judge "does this align with our intent?"
 - May miss nuance in business logic or architectural decisions
 - Context window limits understanding of large codebases
+- Can fabricate plausible URLs and references that survive structural review
 
 **Human-in-the-loop achieves 22% higher accuracy** than fully automated or fully manual approaches. The stop-after-each-stage pattern implements this.
 
