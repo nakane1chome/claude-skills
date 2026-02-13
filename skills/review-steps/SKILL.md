@@ -8,6 +8,8 @@ This skill is for **polishing** existing documents at `$ARGUMENTS` — not gener
 
 **Stop after each stage and have changes reviewed with user.**
 
+> **Feedback loop**: When the user gives feedback on a stage, **revise that stage's output** by synthesizing the feedback with your review findings. Don't just acknowledge the feedback or apply it verbatim — incorporate it into the review work you've already done and present updated suggestions. Only move to the next stage when the user approves.
+
 > **Note**: Review improves what exists within its structure. The agent handles mechanical checks and research; the developer holds final authority on judgment calls. When a suggestion changes meaning, ask — don't assume.
 >
 > See `responsibilities.md` for the full agent/developer ownership matrix.
