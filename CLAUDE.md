@@ -22,10 +22,12 @@ Each skill lives in `skills/<skill-name>/` and contains:
 | **agent-optimize** | Optimize docs for AI agent consumption | Verbose prose that agents will need to parse |
 | **sdlc-cross-review** | Completeness + parent document consistency | Document that needs checking against its SDLC hierarchy |
 | **review-skill** | Review a SKILL.md for quality and conventions | New or existing skill that needs checking before use |
+| **dev-record** | Record agent activity via hooks | Setting up passive session recording for audit |
 
 ## Conventions
 
-- All skills use a **stop-after-each-stage** pattern — the agent pauses for developer review between stages
+- Document skills use a **stop-after-each-stage** pattern — the agent pauses for developer review between stages
+- Infrastructure skills (e.g. dev-record) use an **action-dispatch** pattern — the user specifies an action to run
 - Skills with a `responsibilities.md` define which stages the agent leads vs assists on
 - Skills are meant to be composable: `flesh-out` a skeleton, then `review-steps` the result, then `strong-edit` the final draft
 
