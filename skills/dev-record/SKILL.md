@@ -17,60 +17,21 @@ Passive recording of agent activity during Claude Code sessions. Captures what w
 
 ### `install`
 
-Set up passive recording in the current project. Confirm each step with the user before proceeding.
+Set up passive recording in the current project.
 
-**Prerequisites:**
-- Verify `jq` is installed (hooks depend on it)
+Locate this skill's `install.sh` script (search for `skills/dev-record/install.sh` under the project or `~/.claude/skills/`) and run it from the project root:
 
-**Step 1 — Copy hook scripts:**
-- Locate this skill's `hooks/` directory (search for `skills/dev-record/hooks/` under the project or `~/.claude/skills/`)
-- Copy the 4 scripts to `.claude/hooks/dev-record/` in the project
-- Make them executable
-
-**Step 2 — Configure hooks in settings:**
-- Read `.claude/settings.json` (create if it doesn't exist)
-- Merge the hook configuration below into the `hooks` key
-- If a `hooks` key already exists, append to each event's array — do not overwrite existing hooks
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/dev-record/record-prompt.sh\""}]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/dev-record/record-tool-call.sh\""}]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/dev-record/record-tool-result.sh\""}]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "",
-        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/dev-record/finalize-session.sh\""}]
-      }
-    ]
-  }
-}
+```bash
+bash /path/to/skills/dev-record/install.sh
 ```
 
-**Step 3 — Add `audit/ops_record/` to `.gitignore`:**
-- Read the project's `.gitignore` (create if it doesn't exist)
-- Add `audit/ops_record/` if not already present
-
-**Step 4 — Add self-reporting guidance to CLAUDE.md:**
-- Read the project's `CLAUDE.md`
-- Append the snippet from the "CLAUDE.md Snippet" section below
-- If a "Dev Record" section already exists, skip this step
+The script:
+1. Verifies `jq` is installed
+2. Copies the 4 hook scripts to `.claude/hooks/dev-record/`
+3. Merges hook configuration into `.claude/settings.json` (appends to existing hooks)
+4. Adds `audit/ops_record/` to `.gitignore`
+5. Appends agent self-reporting guidance to `CLAUDE.md`
+6. Creates `audit/ops_record/` and `audit/dev_record/` directories
 
 ### `status`
 
