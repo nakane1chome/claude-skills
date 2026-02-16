@@ -11,7 +11,7 @@ TOOL_RESPONSE=$(echo "$INPUT" | jq '.tool_response // {}')
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/dev_record"
+LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/ops_record"
 mkdir -p "$LOG_DIR"
 
 # Find existing log file for this session, or create one with timestamp prefix

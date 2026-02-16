@@ -9,7 +9,7 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 PROMPT=$(echo "$INPUT" | jq -r '.prompt')
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/dev_record"
+LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/ops_record"
 mkdir -p "$LOG_DIR"
 
 # Find existing log file for this session, or create one with timestamp prefix

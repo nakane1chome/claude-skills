@@ -1,6 +1,7 @@
 #!/bin/bash
 # Hook: SessionEnd
-# Reads the session event log and writes a summary JSON file.
+# Reads the session event log from ops_record and writes project artifacts
+# (session summary + agent reports) to dev_record.
 
 set -euo pipefail
 
@@ -8,18 +9,22 @@ INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/dev_record"
+OPS_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/ops_record"
+DEV_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/dev_record"
 
 # Find the JSONL log file for this session
-LOG_FILE=$(find "$LOG_DIR" -maxdepth 1 -name "*-${SESSION_ID}.jsonl" -print -quit 2>/dev/null)
+LOG_FILE=$(find "$OPS_DIR" -maxdepth 1 -name "*-${SESSION_ID}.jsonl" -print -quit 2>/dev/null)
 
 # Nothing to summarize if no events were recorded
 if [ -z "$LOG_FILE" ] || [ ! -f "$LOG_FILE" ]; then
   exit 0
 fi
 
-# Derive summary filename from the JSONL filename (same timestamp prefix)
-SUMMARY_FILE="${LOG_FILE%.jsonl}.json"
+mkdir -p "$DEV_DIR"
+
+# Derive filenames from the JSONL filename (same timestamp prefix)
+BASENAME=$(basename "$LOG_FILE" .jsonl)
+SUMMARY_FILE="$DEV_DIR/${BASENAME}.json"
 
 # Count events by type
 TOOL_ATTEMPTS=$(jq -s '[.[] | select(.type == "tool_call")] | length' "$LOG_FILE")
@@ -41,7 +46,7 @@ CORRECTIONS=$(jq -s '
 # Get first event timestamp as session start
 STARTED=$(jq -s '.[0].timestamp // empty' "$LOG_FILE")
 
-# Write session summary
+# Write session summary to dev_record (project artifact)
 jq -n \
   --arg sid "$SESSION_ID" \
   --argjson started "${STARTED:-\"$TIMESTAMP\"}" \
@@ -63,5 +68,14 @@ jq -n \
     agent_reports: $reports,
     plan_snapshots: $snapshots
   }' > "$SUMMARY_FILE"
+
+# Extract agent_report and plan_snapshot events to dev_record (project artifacts)
+jq -c 'select(.type == "agent_report" or .type == "plan_snapshot")' "$LOG_FILE" \
+  > "$DEV_DIR/${BASENAME}-events.jsonl" 2>/dev/null || true
+
+# Remove empty events file if no agent reports or plan snapshots existed
+if [ ! -s "$DEV_DIR/${BASENAME}-events.jsonl" ]; then
+  rm -f "$DEV_DIR/${BASENAME}-events.jsonl"
+fi
 
 exit 0

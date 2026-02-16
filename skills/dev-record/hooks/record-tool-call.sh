@@ -10,7 +10,7 @@ TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name')
 TOOL_INPUT=$(echo "$INPUT" | jq '.tool_input')
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/dev_record"
+LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/ops_record"
 mkdir -p "$LOG_DIR"
 
 # Find existing log file for this session, or create one with timestamp prefix
