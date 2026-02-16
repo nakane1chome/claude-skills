@@ -99,16 +99,19 @@ Report the current state of dev-record in the project.
 |--------|--------|
 | `tool_attempts` | Count of `PreToolUse` events |
 | `tool_rejections` | Count of tool calls denied by the user |
-| `corrections` | User prompts that immediately follow a tool rejection (estimated — see note) |
+| `corrections` | User prompts that immediately follow a tool rejection (estimated — may overcount after benign failures and undercount approach-level corrections) |
 | `user_prompts` | Total human inputs in the session |
 
 **Agent self-reported** (hooks cannot detect intent — the agent must self-report):
 
 | Event | When to report |
 |-------|----------------|
+| `plan_stated` | Agent commits to an approach — especially when implementing from a design document or specification, where the plan emerges from reading rather than from formal plan mode |
 | `plan_deviation` | Agent makes a decision that differs from the committed plan |
 | `declined_difficult` | Agent declines work because it would be difficult |
 | `ignored_prior_failure` | Agent discovers a prior failure and chooses not to resolve it |
+
+> **Limitation**: Self-reporting is least reliable for the exact situations it's designed to capture. An agent that declines difficult work may rationalize it as "out of scope" rather than flag it. Treat self-reported events as a lower bound, not a complete record. The developer should review sessions and append additional `agent_report` entries for events the agent missed.
 
 ### Data Schema
 
@@ -119,6 +122,7 @@ Report the current state of dev-record in the project.
 {"timestamp": "ISO8601", "session_id": "str", "type": "tool_call", "content": {"tool": "Edit", "input": {}}}
 {"timestamp": "ISO8601", "session_id": "str", "type": "tool_result", "content": {"tool": "Edit", "success": true}}
 {"timestamp": "ISO8601", "session_id": "str", "type": "plan_snapshot", "content": {"transcript_path": "..."}}
+{"timestamp": "ISO8601", "session_id": "str", "type": "agent_report", "content": {"event": "plan_stated", "detail": "..."}}
 {"timestamp": "ISO8601", "session_id": "str", "type": "agent_report", "content": {"event": "plan_deviation", "detail": "..."}}
 ```
 
@@ -145,14 +149,24 @@ The install action appends the following to the project's CLAUDE.md. This instru
 ```markdown
 ## Dev Record — Agent Self-Reporting
 
-During sessions, if any of the following occur, append a JSONL line to
-the session's event log in `audit/dev_record/`:
+You MUST append a JSONL line to the session's event log in `audit/dev_record/`
+when any of the following occur. Failure to report is itself a deviation.
 
-- **Plan deviation**: A decision that differs from the committed plan
-- **Declined as difficult**: Declining to do something because it would be difficult
-- **Ignored prior failure**: Discovering a prior failure and choosing not to resolve it
+- **Plan stated**: You commit to an approach — especially when implementing from a design document or spec. Record the plan before executing it.
+- **Plan deviation**: You make a decision that differs from the committed plan.
+- **Declined as difficult**: You decline work because it would be difficult.
+- **Ignored prior failure**: You discover a prior failure and choose not to resolve it.
 
-Format: {"timestamp":"ISO8601","session_id":"SESSION_ID","type":"agent_report","content":{"event":"plan_deviation|declined_difficult|ignored_prior_failure","detail":"brief description"}}
+Format (one JSON object per line):
+{
+  "timestamp": "ISO8601",
+  "session_id": "SESSION_ID",
+  "type": "agent_report",
+  "content": {
+    "event": "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure",
+    "detail": "brief description"
+  }
+}
 ```
 
 ### Hook Scripts
