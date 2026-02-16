@@ -19,11 +19,7 @@ Passive recording of agent activity during Claude Code sessions. Captures what w
 
 Set up passive recording in the current project.
 
-Locate this skill's `install.sh` script (search for `skills/dev-record/install.sh` under the project or `~/.claude/skills/`) and run it from the project root:
-
-```bash
-bash /path/to/skills/dev-record/install.sh
-```
+Run `./install.sh` from this skill's directory.
 
 The script:
 1. Verifies `jq` is installed
