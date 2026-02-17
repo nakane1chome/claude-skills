@@ -43,6 +43,11 @@ All skills in this library use a **stop-after-each-stage** pattern — the agent
 
 Skills are composable: **flesh-out** a skeleton, then **review-steps** the result, then **strong-edit** the final draft.
 
+## Links
+
+- [Awesome Claude Code](https://github.com/hesreallyhim/awesome-claude-code) — curated list of Claude Code skills, hooks, commands, and tools
+- [Claude Skill: Document Review Pipeline](https://www.shincbm.com/agentic-code/2026/02/15/claude-skill-document-review.html) — blog post on the design of these skills
+
 ## License
 
 [Unlicense](LICENSE) (public domain)
