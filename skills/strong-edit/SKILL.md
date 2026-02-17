@@ -57,6 +57,7 @@ This skill is for **critical evaluation** of `$ARGUMENTS` - not polish (review-s
    - Tighten verbose passages
    - Sharpen vague statements into concrete claims
    - Replace weak examples with stronger ones
+   - If edits introduce or modify external references, verify each URL resolves and supports the claim before presenting
 
 6. **Final assessment** (agent leads)
    - Does the piece achieve its stated purpose?
