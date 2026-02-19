@@ -16,8 +16,10 @@ This skill is for **generative** work on crude/raw content at `$ARGUMENTS` - not
 0. **Extract core ideas** (developer leads)
    - Read the raw content and identify the key concepts
    - List what the developer appears to be saying (don't fix typos yet)
-   - Confirm understanding with developer before proceeding
+   - What is the document's **function**? (its type and role — e.g., design doc, tutorial, proposal)
+   - What is the document's **goal**? (the concrete outcome it exists to produce — e.g., a working implementation, an adopted practice)
    - Identify gaps: "You mention X but don't explain Y - should I research this?"
+   - Confirm understanding with developer before proceeding
 
 1. **Research and expand** (agent leads with approval)
    - Web search for external concepts if applicable
@@ -29,6 +31,7 @@ This skill is for **generative** work on crude/raw content at `$ARGUMENTS` - not
 2. **Structure the content** (agent leads with approval)
    - Determine appropriate document structure (based on template if available)
    - Organize ideas into logical sections
+   - Does the structure serve the document's function and support its goal?
    - Create hierarchy (headers, sub-sections)
    - Add diagrams or tables where relationships exist
 
