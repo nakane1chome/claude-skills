@@ -14,6 +14,8 @@ This skill is for **critical evaluation** of `$ARGUMENTS` - not polish (review-s
 
 
 0. **Read and identify the core argument** (developer confirms)
+   - What is the document's **function**? (its type and role — e.g., design doc specifying the auth system, op-ed arguing for policy X)
+   - What is the document's **goal**? (the concrete outcome it exists to produce — e.g., a working implementation, a policy change)
    - What is this article trying to say?
    - Who is the intended audience?
    - What action or understanding should readers have afterward?
@@ -25,12 +27,14 @@ This skill is for **critical evaluation** of `$ARGUMENTS` - not polish (review-s
    - Is the logical flow sound? (premise -> evidence -> conclusion)
    - Are there structural gaps or non-sequiturs?
    - Is the conclusion earned by what precedes it?
+   - Does the structure serve the document's function and support its goal?
    - Present findings and ask the developer which structural issues matter most before moving on
 
 2. **Assess relevance and focus** (agent critiques, developer discusses)
    - Does every paragraph serve the core argument?
    - Identify tangents, digressions, or scope creep
    - Flag content that weakens the piece by diluting focus
+   - Does the content stay aligned with the document's function and goal?
    - Identify missing content that would strengthen the argument
    - Recommend cuts (be specific — quote what should go)
    - Ask: which of these cuts does the developer agree with? Is anything flagged actually intentional?
@@ -41,6 +45,7 @@ This skill is for **critical evaluation** of `$ARGUMENTS` - not polish (review-s
    - What would a skeptical reader question?
    - Are counterarguments acknowledged where needed?
    - Is the argument differentiated from obvious alternatives?
+   - Would the argument, as presented, achieve the document's goal?
    - Ask: does the developer have evidence or context that addresses these challenges?
 
 4. **Evaluate readability** (agent critiques, developer discusses)
@@ -60,7 +65,8 @@ This skill is for **critical evaluation** of `$ARGUMENTS` - not polish (review-s
    - If edits introduce or modify external references, verify each URL resolves and supports the claim before presenting
 
 6. **Final assessment** (agent leads)
-   - Does the piece achieve its stated purpose?
+   - Does the piece fulfill its function?
+   - Does the piece achieve its goal?
    - What's the single biggest remaining weakness?
    - Recommendation: publish / revise further / rethink approach
 
