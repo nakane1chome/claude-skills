@@ -17,6 +17,8 @@ This skill is for **polishing** existing documents at `$ARGUMENTS` — not gener
 0. **Read and understand the document** (developer confirms)
    - Read the target document and identify its current state
    - What is the document about and who is the intended audience?
+   - What is the document's **function**? (its type and role — e.g., design doc, tutorial, proposal)
+   - What is the document's **goal**? (the concrete outcome it exists to produce — e.g., a working implementation, an adopted practice)
    - Is this a draft that needs polish, or does it need more fundamental work (flesh-out or strong-edit instead)?
    - Confirm understanding before proceeding
 
