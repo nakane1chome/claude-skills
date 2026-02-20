@@ -12,10 +12,8 @@ async def test_bare_install(installed_project, sdk, audit):
     session_id = sdk.session_id(messages)
     assert session_id is not None, "No session_id found in ResultMessage"
 
-    # Finalize to ensure session summary is generated
-    audit.finalize(project_dir, session_id)
-
-    # Common Check 1
+    # SessionEnd hook should have fired when the CLI exited, producing the summary.
+    # No manual audit.finalize() — we're testing that the hook works end-to-end.
     audit.assert_common(project_dir)
 
     # Verify session summary contents

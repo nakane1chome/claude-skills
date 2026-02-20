@@ -57,7 +57,6 @@ async def test_full_workflow(installed_project, sdk, audit, model):
     )
     plan_session_id = sdk.session_id(plan_messages)
     assert plan_session_id is not None, "No session_id from plan phase"
-    audit.finalize(project_dir, plan_session_id)
     session_ids.append(plan_session_id)
 
     # ------------------------------------------------------------------
@@ -73,7 +72,6 @@ async def test_full_workflow(installed_project, sdk, audit, model):
         f"Implementation phase ended with error: {sdk.text(impl_messages)[-500:]}"
     )
     impl_session_id = impl_result.session_id
-    audit.finalize(project_dir, impl_session_id)
     session_ids.append(impl_session_id)
 
     # Verify at least one test file was created
@@ -109,7 +107,6 @@ async def test_full_workflow(installed_project, sdk, audit, model):
     extend_result = sdk.result(extend_messages)
     assert extend_result is not None, "No ResultMessage from extend phase"
     extend_session_id = extend_result.session_id
-    audit.finalize(project_dir, extend_session_id)
     session_ids.append(extend_session_id)
 
     # ------------------------------------------------------------------
