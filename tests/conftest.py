@@ -229,6 +229,20 @@ class _SDKHelpers:
                         parts.append(block.text)
         return "\n".join(parts)
 
+    @staticmethod
+    def metrics(messages: list) -> dict:
+        """Extract session metrics from ResultMessage for report generation."""
+        for msg in messages:
+            if isinstance(msg, ResultMessage):
+                return {
+                    "num_turns": msg.num_turns,
+                    "duration_ms": msg.duration_ms,
+                    "duration_api_ms": msg.duration_api_ms,
+                    "total_cost_usd": msg.total_cost_usd,
+                    "usage": msg.usage or {},
+                }
+        return {}
+
 
 @pytest.fixture(scope="session")
 def sdk():

@@ -170,12 +170,20 @@ class _AuditHelpers:
         *,
         title: str | None = None,
         model: str | None = None,
+        session_metrics: dict[str, dict] | None = None,
     ) -> Path:
         """Generate a self-contained HTML session report from audit data.
 
         Auto-discovers all sessions from audit/dev_record/*.json.
+
+        session_metrics: optional dict keyed by session_id with SDK-level
+        metrics from ResultMessage (input_tokens, output_tokens, total_cost_usd,
+        duration_ms, duration_api_ms, num_turns, cache_read_input_tokens,
+        cache_creation_input_tokens).
+
         Returns the output_path for convenience.
         """
+        session_metrics = session_metrics or {}
         title = title or "Dev-Record Session Report"
         dev_dir = project_dir / "audit" / "dev_record"
         ops_dir = project_dir / "audit" / "ops_record"
@@ -198,6 +206,7 @@ class _AuditHelpers:
                 "session_id": sid,
                 "summary": summary,
                 "ops_events": ops_events,
+                "metrics": session_metrics.get(sid, {}),
             })
 
         # --- Aggregate stats ---
@@ -350,12 +359,17 @@ class _AuditHelpers:
 """)
 
         # --- Summary table ---
+        has_metrics = any(s["metrics"] for s in sessions)
         parts.append("<h2>Session Summary</h2>\n<table><tr>")
-        for col in ["#", "Session ID", "Started", "Ended", "Tools", "Rejected", "Prompts", "Plans", "Agent Reports"]:
+        cols = ["#", "Session ID", "Started", "Ended", "Tools", "Rejected", "Prompts", "Plans", "Reports"]
+        if has_metrics:
+            cols += ["Turns", "In Tokens", "Out Tokens", "Cost", "Duration"]
+        for col in cols:
             parts.append(f"<th>{col}</th>")
         parts.append("</tr>")
         for i, s in enumerate(sessions, 1):
             sm = s["summary"]
+            m = s["metrics"]
             sid_short = s["session_id"][:12]
             parts.append(f"""<tr>
 <td>{i}</td>
@@ -366,8 +380,21 @@ class _AuditHelpers:
 <td>{sm.get('tool_rejections', 0)}</td>
 <td>{sm.get('user_prompts', 0)}</td>
 <td>{sm.get('plan_snapshots', 0)}</td>
-<td>{len(sm['agent_reports']) if isinstance(sm.get('agent_reports'), list) else sm.get('agent_reports', 0)}</td>
-</tr>""")
+<td>{len(sm['agent_reports']) if isinstance(sm.get('agent_reports'), list) else sm.get('agent_reports', 0)}</td>""")
+            if has_metrics:
+                usage = m.get("usage", {})
+                in_tok = usage.get("input_tokens", 0)
+                out_tok = usage.get("output_tokens", 0)
+                cost = m.get("total_cost_usd")
+                cost_str = f"${cost:.4f}" if cost is not None else "—"
+                dur = m.get("duration_ms", 0)
+                dur_str = f"{dur / 1000:.1f}s" if dur else "—"
+                parts.append(f"""<td>{m.get('num_turns', '—')}</td>
+<td class="mono">{in_tok:,}</td>
+<td class="mono">{out_tok:,}</td>
+<td class="mono">{cost_str}</td>
+<td class="mono">{dur_str}</td>""")
+            parts.append("</tr>")
         parts.append("</table>")
 
         # --- Per-session detail ---
@@ -378,6 +405,7 @@ class _AuditHelpers:
             parts.append(f'<h3>Session {i}: <span class="mono">{h(sid_short)}</span></h3>')
             ar = sm.get('agent_reports')
             ar_count = len(ar) if isinstance(ar, list) else (ar or 0)
+            m = s["metrics"]
             stat_items = [
                 ("tools", sm.get('tool_attempts', 0)),
                 ("rejected", sm.get('tool_rejections', 0)),
@@ -385,6 +413,23 @@ class _AuditHelpers:
                 ("plans", sm.get('plan_snapshots', 0)),
                 ("agent reports", ar_count),
             ]
+            if m:
+                usage = m.get("usage", {})
+                in_tok = usage.get("input_tokens", 0)
+                out_tok = usage.get("output_tokens", 0)
+                cache_read = usage.get("cache_read_input_tokens", 0)
+                cost = m.get("total_cost_usd")
+                dur = m.get("duration_ms", 0)
+                api_dur = m.get("duration_api_ms", 0)
+                stat_items += [
+                    ("turns", m.get("num_turns", 0)),
+                    ("in tokens", f"{in_tok:,}"),
+                    ("out tokens", f"{out_tok:,}"),
+                    ("cache read", f"{cache_read:,}"),
+                    ("cost", f"${cost:.4f}" if cost is not None else "—"),
+                    ("duration", f"{dur / 1000:.1f}s" if dur else "—"),
+                    ("api time", f"{api_dur / 1000:.1f}s" if api_dur else "—"),
+                ]
             chips = "".join(
                 f'<span class="session-stat">'
                 f'<span class="stat-name">{name}</span> '
@@ -481,6 +526,24 @@ class _AuditHelpers:
         parts.append(f'<div class="stat-card"><div class="label">Tool Successes</div><div class="value">{success_count}</div></div>')
         parts.append(f'<div class="stat-card"><div class="label">Tool Failures</div><div class="value">{failure_count}</div></div>')
         parts.append(f'<div class="stat-card"><div class="label">Sessions</div><div class="value">{len(sessions)}</div></div>')
+        if has_metrics:
+            all_usage = [s["metrics"].get("usage", {}) for s in sessions if s["metrics"]]
+            total_in = sum(u.get("input_tokens", 0) for u in all_usage)
+            total_out = sum(u.get("output_tokens", 0) for u in all_usage)
+            total_cache_read = sum(u.get("cache_read_input_tokens", 0) for u in all_usage)
+            total_cache_create = sum(u.get("cache_creation_input_tokens", 0) for u in all_usage)
+            total_cost = sum(s["metrics"].get("total_cost_usd", 0) or 0 for s in sessions if s["metrics"])
+            total_dur = sum(s["metrics"].get("duration_ms", 0) for s in sessions if s["metrics"])
+            total_api_dur = sum(s["metrics"].get("duration_api_ms", 0) for s in sessions if s["metrics"])
+            total_turns = sum(s["metrics"].get("num_turns", 0) for s in sessions if s["metrics"])
+            parts.append(f'<div class="stat-card"><div class="label">Total Turns</div><div class="value">{total_turns}</div></div>')
+            parts.append(f'<div class="stat-card"><div class="label">Input Tokens</div><div class="value">{total_in:,}</div></div>')
+            parts.append(f'<div class="stat-card"><div class="label">Output Tokens</div><div class="value">{total_out:,}</div></div>')
+            parts.append(f'<div class="stat-card"><div class="label">Cache Read</div><div class="value">{total_cache_read:,}</div></div>')
+            parts.append(f'<div class="stat-card"><div class="label">Cache Created</div><div class="value">{total_cache_create:,}</div></div>')
+            parts.append(f'<div class="stat-card"><div class="label">Total Cost</div><div class="value">${total_cost:.4f}</div></div>')
+            parts.append(f'<div class="stat-card"><div class="label">Total Duration</div><div class="value">{total_dur / 1000:.0f}s</div></div>')
+            parts.append(f'<div class="stat-card"><div class="label">API Time</div><div class="value">{total_api_dur / 1000:.0f}s</div></div>')
         parts.append("</div>")
 
         if tool_usage:
@@ -498,3 +561,64 @@ class _AuditHelpers:
 @pytest.fixture(scope="session")
 def audit():
     return _AuditHelpers()
+
+
+# ---------------------------------------------------------------------------
+# report fixture — always generates HTML report on teardown
+# ---------------------------------------------------------------------------
+
+
+class _ReportCollector:
+    """Collects session metrics during a test, generates report on finalize."""
+
+    def __init__(self):
+        self.session_metrics: dict[str, dict] = {}
+        self._project_dir: Path | None = None
+        self._model: str | None = None
+        self._model_alias: str | None = None
+        self._title: str | None = None
+        self._test_file: Path | None = None
+
+    def configure(self, *, project_dir: Path, model: str, model_alias: str,
+                  title: str, test_file: Path) -> None:
+        self._project_dir = project_dir
+        self._model = model
+        self._model_alias = model_alias
+        self._title = title
+        self._test_file = test_file
+
+    def add(self, session_id: str, metrics: dict) -> None:
+        self.session_metrics[session_id] = metrics
+
+    def finalize(self) -> Path | None:
+        if self._project_dir is None or self._test_file is None:
+            return None
+        # Generate into project dir
+        report_path = self._project_dir / "test-report.html"
+        _AuditHelpers.generate_report(
+            self._project_dir, report_path,
+            model=self._model, title=self._title,
+            session_metrics=self.session_metrics,
+        )
+        # Copy to stable reports directory
+        test_dir = self._test_file.resolve().parent.relative_to(
+            self._test_file.resolve().parent.parent.parent
+        )
+        test_name = self._test_file.stem.removeprefix("test_")
+        reports_dir = self._test_file.resolve().parent.parent.parent / "reports"
+        reports_dir.mkdir(exist_ok=True)
+        stable_path = reports_dir / (
+            f"{test_dir.as_posix().replace('/', '-')}-{test_name}-{self._model_alias}.html"
+        )
+        import shutil
+        shutil.copy2(report_path, stable_path)
+        return stable_path
+
+
+@pytest.fixture
+def report(request):
+    collector = _ReportCollector()
+    yield collector
+    path = collector.finalize()
+    if path:
+        print(f"\nHTML report: {path}")

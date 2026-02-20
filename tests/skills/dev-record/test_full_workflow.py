@@ -1,7 +1,6 @@
 """Test 2: Full workflow — multi-phase development session produces a complete audit trail."""
 
 import re
-import shutil
 from pathlib import Path
 
 import pytest
@@ -41,11 +40,15 @@ Important: Do not fix any pre-existing test failures. Only add the new language 
 """
 
 
-async def test_full_workflow(installed_project, sdk, audit, model, model_alias):
+async def test_full_workflow(installed_project, sdk, audit, model, model_alias, request, report):
     if "haiku" in model:
-        pytest.xfail("Haiku is too weak for reliable multi-step tool use")
+        request.node.add_marker(pytest.mark.xfail(
+            reason="Haiku is too weak for reliable multi-step tool use"))
 
     project_dir, claude_query = installed_project
+
+    report.configure(project_dir=project_dir, model=model, model_alias=model_alias,
+                     title="Full Workflow Test Report", test_file=Path(__file__))
 
     session_ids = []
 
@@ -60,6 +63,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias):
     plan_session_id = sdk.session_id(plan_messages)
     assert plan_session_id is not None, "No session_id from plan phase"
     session_ids.append(plan_session_id)
+    report.add(plan_session_id, sdk.metrics(plan_messages))
 
     # ------------------------------------------------------------------
     # Phase 1b — Implement (fresh session, cleared context)
@@ -75,6 +79,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias):
     )
     impl_session_id = impl_result.session_id
     session_ids.append(impl_session_id)
+    report.add(impl_session_id, sdk.metrics(impl_messages))
 
     # Verify at least one test file was created
     test_files = list(project_dir.glob("**/test_*.py"))
@@ -110,6 +115,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias):
     assert extend_result is not None, "No ResultMessage from extend phase"
     extend_session_id = extend_result.session_id
     session_ids.append(extend_session_id)
+    report.add(extend_session_id, sdk.metrics(extend_messages))
 
     # ------------------------------------------------------------------
     # Audit verification
@@ -174,20 +180,3 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias):
             stacklevel=1,
         )
 
-    # ------------------------------------------------------------------
-    # Generate HTML session report
-    # ------------------------------------------------------------------
-    report_path = project_dir / "test-report.html"
-    audit.generate_report(project_dir, report_path, model=model,
-                          title="Full Workflow Test Report")
-
-    # Copy to stable reports directory
-    test_dir = Path(__file__).resolve().parent.relative_to(
-        Path(__file__).resolve().parent.parent.parent
-    )
-    reports_dir = Path(__file__).resolve().parent.parent.parent / "reports"
-    reports_dir.mkdir(exist_ok=True)
-    test_name = Path(__file__).stem.removeprefix("test_")
-    stable_path = reports_dir / f"{test_dir.as_posix().replace('/', '-')}-{test_name}-{model_alias}.html"
-    shutil.copy2(report_path, stable_path)
-    print(f"\nHTML report: {stable_path}")
