@@ -296,6 +296,9 @@ class _AuditHelpers:
                 detail = c.get("detail", "")
                 return f"agent_report: {h(event_name)}  {_truncate(str(detail), 80)}"
             if t == "plan_snapshot":
+                plan_file = c.get("plan_file", "")
+                if plan_file:
+                    return f'plan_snapshot: <a href="file://{h(plan_file)}">{h(Path(plan_file).name)}</a>'
                 return "plan_snapshot"
             return h(t)
 

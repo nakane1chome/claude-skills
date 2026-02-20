@@ -8,7 +8,6 @@ INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name')
 TOOL_RESPONSE=$(echo "$INPUT" | jq '.tool_response // {}')
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/ops_record"
@@ -27,12 +26,5 @@ SUCCESS=$(echo "$TOOL_RESPONSE" | jq -r 'if .success == false then "false" else 
 jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg tool "$TOOL_NAME" --arg ok "$SUCCESS" \
   '{timestamp: $ts, session_id: $sid, type: "tool_result", content: {tool: $tool, success: ($ok == "true")}}' \
   >> "$LOG_FILE"
-
-# If this was a plan mode exit, record a plan snapshot
-if [ "$TOOL_NAME" = "ExitPlanMode" ] && [ -n "$TRANSCRIPT_PATH" ]; then
-  jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg tp "$TRANSCRIPT_PATH" \
-    '{timestamp: $ts, session_id: $sid, type: "plan_snapshot", content: {transcript_path: $tp}}' \
-    >> "$LOG_FILE"
-fi
 
 exit 0
