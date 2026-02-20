@@ -171,3 +171,11 @@ async def test_full_workflow(installed_project, sdk, audit, model):
             f"Agent reports found: {[e.get('content', {}).get('event') for e in agent_reports]}",
             stacklevel=1,
         )
+
+    # ------------------------------------------------------------------
+    # Generate HTML session report
+    # ------------------------------------------------------------------
+    report_path = project_dir / "test-report.html"
+    audit.generate_report(project_dir, report_path, model=model,
+                          title="Full Workflow Test Report")
+    print(f"\nHTML report: {report_path}")
