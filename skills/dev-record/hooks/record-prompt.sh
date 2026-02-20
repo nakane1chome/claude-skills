@@ -19,7 +19,7 @@ if [ -z "$LOG_FILE" ]; then
   LOG_FILE="$LOG_DIR/${FILE_TS}-${SESSION_ID}.jsonl"
 fi
 
-jq -n --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg p "$PROMPT" \
+jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg p "$PROMPT" \
   '{timestamp: $ts, session_id: $sid, type: "user_prompt", content: {prompt: $p}}' \
   >> "$LOG_FILE"
 

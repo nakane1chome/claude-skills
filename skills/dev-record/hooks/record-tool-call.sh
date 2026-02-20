@@ -20,7 +20,7 @@ if [ -z "$LOG_FILE" ]; then
   LOG_FILE="$LOG_DIR/${FILE_TS}-${SESSION_ID}.jsonl"
 fi
 
-jq -n --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg tool "$TOOL_NAME" --argjson input "$TOOL_INPUT" \
+jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg tool "$TOOL_NAME" --argjson input "$TOOL_INPUT" \
   '{timestamp: $ts, session_id: $sid, type: "tool_call", content: {tool: $tool, input: $input}}' \
   >> "$LOG_FILE"
 
