@@ -1,6 +1,8 @@
 """Test 2: Full workflow — multi-phase development session produces a complete audit trail."""
 
 import re
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -39,9 +41,9 @@ Important: Do not fix any pre-existing test failures. Only add the new language 
 """
 
 
-async def test_full_workflow(installed_project, sdk, audit, model):
+async def test_full_workflow(installed_project, sdk, audit, model, model_alias):
     if "haiku" in model:
-        pytest.skip("Full workflow requires mid or strongest model (haiku too weak for multi-step tool use)")
+        pytest.xfail("Haiku is too weak for reliable multi-step tool use")
 
     project_dir, claude_query = installed_project
 
@@ -178,4 +180,14 @@ async def test_full_workflow(installed_project, sdk, audit, model):
     report_path = project_dir / "test-report.html"
     audit.generate_report(project_dir, report_path, model=model,
                           title="Full Workflow Test Report")
-    print(f"\nHTML report: {report_path}")
+
+    # Copy to stable reports directory
+    test_dir = Path(__file__).resolve().parent.relative_to(
+        Path(__file__).resolve().parent.parent.parent
+    )
+    reports_dir = Path(__file__).resolve().parent.parent.parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    test_name = Path(__file__).stem.removeprefix("test_")
+    stable_path = reports_dir / f"{test_dir.as_posix().replace('/', '-')}-{test_name}-{model_alias}.html"
+    shutil.copy2(report_path, stable_path)
+    print(f"\nHTML report: {stable_path}")

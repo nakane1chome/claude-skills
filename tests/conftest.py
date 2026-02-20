@@ -69,6 +69,11 @@ def model(request):
     return MODEL_MAP[alias]
 
 
+@pytest.fixture(scope="session")
+def model_alias(request):
+    return request.config.getoption("--model")
+
+
 # ---------------------------------------------------------------------------
 # Repo root (for install.sh)
 # ---------------------------------------------------------------------------
