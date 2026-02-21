@@ -36,7 +36,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +59,7 @@ jobs:
           pytest tests/skills/dev-record/test_full_workflow.py \
             --model ${{ matrix.model }} \
             --basetemp "$GITHUB_WORKSPACE/.pytest-tmp" \
-            -v --tb=long --runxfail
+            -v --tb=long
 
       - name: Upload HTML report
         if: always()
@@ -76,6 +76,7 @@ jobs:
           name: sandbox-${{ matrix.model }}
           path: .pytest-tmp/
           if-no-files-found: ignore
+          include-hidden-files: true
 
       - name: Job summary
         if: always()

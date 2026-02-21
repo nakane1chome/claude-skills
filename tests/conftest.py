@@ -91,11 +91,12 @@ async def sandbox_project(tmp_path, monkeypatch):
     """Create an isolated project directory with git and all skills installed."""
     real_home = Path.home()
 
-    # Check for auth: either ANTHROPIC_API_KEY or OAuth credentials
+    # Check for auth: API key, OAuth token, or local credentials
     api_key = os.environ.get("ANTHROPIC_API_KEY")
+    oauth_token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
     has_oauth = (real_home / ".claude" / ".credentials.json").is_file()
-    if not api_key and not has_oauth:
-        pytest.skip("No auth: set ANTHROPIC_API_KEY or log in with `claude`")
+    if not api_key and not oauth_token and not has_oauth:
+        pytest.skip("No auth: set ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or log in with `claude`")
 
     project = tmp_path / "project"
     project.mkdir()
