@@ -577,6 +577,7 @@ class _ReportCollector:
 
     def __init__(self):
         self.session_metrics: dict[str, dict] = {}
+        self._sessions: list[dict] = []  # ordered list with phase labels
         self._project_dir: Path | None = None
         self._model: str | None = None
         self._model_alias: str | None = None
@@ -591,8 +592,13 @@ class _ReportCollector:
         self._title = title
         self._test_file = test_file
 
-    def add(self, session_id: str, metrics: dict) -> None:
+    def add(self, session_id: str, metrics: dict, *, phase: str | None = None) -> None:
         self.session_metrics[session_id] = metrics
+        self._sessions.append({
+            "session_id": session_id,
+            "phase": phase,
+            "metrics": metrics,
+        })
 
     def finalize(self) -> Path | None:
         if self._project_dir is None or self._test_file is None:
@@ -616,7 +622,74 @@ class _ReportCollector:
         )
         import shutil
         shutil.copy2(report_path, stable_path)
+
+        # Write JSON + Markdown metrics files alongside HTML for CI job summaries
+        metrics = self._build_metrics()
+        self._write_json(reports_dir, stable_path.stem, metrics)
+        self._write_summary_md(reports_dir, stable_path.stem, metrics)
+
         return stable_path
+
+    def _build_metrics(self) -> dict:
+        """Build the structured metrics payload from collected sessions."""
+        sessions_json = []
+        for s in self._sessions:
+            m = s["metrics"]
+            usage = m.get("usage", {})
+            sessions_json.append({
+                "phase": s["phase"],
+                "session_id": s["session_id"],
+                "num_turns": m.get("num_turns", 0),
+                "duration_s": round(m.get("duration_ms", 0) / 1000, 1),
+                "cost_usd": m.get("total_cost_usd", 0) or 0,
+                "input_tokens": usage.get("input_tokens", 0),
+                "output_tokens": usage.get("output_tokens", 0),
+            })
+
+        totals = {
+            "num_turns": sum(s["num_turns"] for s in sessions_json),
+            "duration_s": round(sum(s["duration_s"] for s in sessions_json), 1),
+            "cost_usd": round(sum(s["cost_usd"] for s in sessions_json), 4),
+            "input_tokens": sum(s["input_tokens"] for s in sessions_json),
+            "output_tokens": sum(s["output_tokens"] for s in sessions_json),
+        }
+
+        return {
+            "model": self._model,
+            "model_alias": self._model_alias,
+            "sessions": sessions_json,
+            "totals": totals,
+        }
+
+    def _write_json(self, reports_dir: Path, stem: str, metrics: dict) -> Path:
+        """Write JSON metrics file for cross-model aggregation in CI."""
+        json_path = reports_dir / f"{stem}.json"
+        json_path.write_text(json.dumps(metrics, indent=2) + "\n")
+        return json_path
+
+    def _write_summary_md(self, reports_dir: Path, stem: str, metrics: dict) -> Path:
+        """Write a Markdown summary snippet for the CI job summary step."""
+        alias = metrics["model_alias"]
+        totals = metrics["totals"]
+        sessions = metrics["sessions"]
+
+        lines = [
+            f"## `{alias}` ({totals['duration_s']}s, ${totals['cost_usd']})",
+            "",
+            "| Phase | Turns | In Tokens | Out Tokens | Cost | Duration |",
+            "|-------|-------|-----------|------------|------|----------|",
+        ]
+        for s in sessions:
+            cost_str = f"${s['cost_usd']:.4f}" if s["cost_usd"] else "$0"
+            lines.append(
+                f"| {s['phase']} | {s['num_turns']} "
+                f"| {s['input_tokens']:,} | {s['output_tokens']:,} "
+                f"| {cost_str} | {s['duration_s']}s |"
+            )
+
+        md_path = reports_dir / f"{stem}.summary.md"
+        md_path.write_text("\n".join(lines) + "\n")
+        return md_path
 
 
 @pytest.fixture

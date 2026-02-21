@@ -63,7 +63,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     plan_session_id = sdk.session_id(plan_messages)
     assert plan_session_id is not None, "No session_id from plan phase"
     session_ids.append(plan_session_id)
-    report.add(plan_session_id, sdk.metrics(plan_messages))
+    report.add(plan_session_id, sdk.metrics(plan_messages), phase="Plan")
 
     # ------------------------------------------------------------------
     # Phase 1b — Implement (fresh session, cleared context)
@@ -79,7 +79,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     )
     impl_session_id = impl_result.session_id
     session_ids.append(impl_session_id)
-    report.add(impl_session_id, sdk.metrics(impl_messages))
+    report.add(impl_session_id, sdk.metrics(impl_messages), phase="Implement")
 
     # Verify at least one test file was created
     test_files = list(project_dir.glob("**/test_*.py"))
@@ -115,7 +115,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     assert extend_result is not None, "No ResultMessage from extend phase"
     extend_session_id = extend_result.session_id
     session_ids.append(extend_session_id)
-    report.add(extend_session_id, sdk.metrics(extend_messages))
+    report.add(extend_session_id, sdk.metrics(extend_messages), phase="Extend")
 
     # ------------------------------------------------------------------
     # Audit verification

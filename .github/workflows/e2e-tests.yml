@@ -1,8 +1,6 @@
 name: E2E Tests (dev-record)
 
 on:
-  push:
-    branches: [dev-record-plugin]
   workflow_dispatch:
     inputs:
       models:
@@ -61,13 +59,16 @@ jobs:
             --basetemp "$GITHUB_WORKSPACE/.pytest-tmp" \
             -v
 
-      - name: Upload HTML report
+      - name: Upload report
         id: upload-report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: report-${{ matrix.model }}
-          path: tests/reports/*${{ matrix.model }}*.html
+          path: |
+            tests/reports/*${{ matrix.model }}*.html
+            tests/reports/*${{ matrix.model }}*.json
+            tests/reports/*${{ matrix.model }}*.summary.md
           if-no-files-found: ignore
 
       - name: Sanitize sandbox filenames
@@ -90,11 +91,42 @@ jobs:
         if: always()
         run: |
           aci="https://www.artifact.ci/artifact/view/${{ github.repository }}/run/${{ github.run_id }}.1"
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## E2E Test: \`${{ matrix.model }}\`
+          md_file=$(ls tests/reports/*${{ matrix.model }}*.summary.md 2>/dev/null | head -1)
 
-          | Artifact | |
-          |----------|------|
-          | HTML Report | [View](${aci}/report-${{ matrix.model }}) |
-          | Sandbox | [View](${aci}/sandbox-${{ matrix.model }}) |
-          EOF
+          if [ -n "$md_file" ]; then
+            cat "$md_file" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## \`${{ matrix.model }}\` — skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No metrics collected (test may have been skipped or failed before reporting)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Report](${aci}/report-${{ matrix.model }}) · [Sandbox](${aci}/sandbox-${{ matrix.model }})" >> "$GITHUB_STEP_SUMMARY"
+
+  summary:
+    needs: [setup, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: report-*
+          path: reports/
+
+      - name: Cross-model summary
+        run: |
+          echo "## E2E Test Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          found=false
+          for md_file in $(find reports/ -name '*.summary.md' | sort); do
+            found=true
+            cat "$md_file" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          if [ "$found" = false ]; then
+            echo "_No metrics collected from any model._" >> "$GITHUB_STEP_SUMMARY"
+          fi
