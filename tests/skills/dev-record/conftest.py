@@ -307,7 +307,9 @@ class _AuditHelpers:
                         rel = Path(plan_file).relative_to(project_dir)
                     except ValueError:
                         rel = Path(plan_file).name
-                    return f'plan_snapshot: <a href="{h(str(rel))}">{h(Path(plan_file).name)}</a>'
+                    href = str(rel).replace(":", "-")
+                    display = Path(plan_file).name.replace(":", "-")
+                    return f'plan_snapshot: <a href="{h(href)}">{h(display)}</a>'
                 return "plan_snapshot"
             return h(t)
 
@@ -502,9 +504,12 @@ class _AuditHelpers:
                     child = node[name]
                     if isinstance(child, str):
                         # Leaf file — child is already relative to project_dir
+                        # Replace colons for cross-platform path compat
+                        href = child.replace(":", "-")
+                        display = name.replace(":", "-")
                         lines.append(
                             f'{h(prefix)}{connector}'
-                            f'<a href="{h(child)}">{h(name)}</a>'
+                            f'<a href="{h(href)}">{h(display)}</a>'
                         )
                     else:
                         # Directory

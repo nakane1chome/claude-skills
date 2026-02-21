@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sandbox-${{ matrix.model }}
-          path: .pytest-tmp/
+          path: .pytest-tmp/test_full_workflow0/project/
           if-no-files-found: ignore
           include-hidden-files: true
 
@@ -90,13 +90,13 @@ jobs:
         if: always()
         run: |
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          report_url="${run_url}/artifacts/${{ steps.upload-report.outputs.artifact-id }}"
-          sandbox_url="${run_url}/artifacts/${{ steps.upload-sandbox.outputs.artifact-id }}"
+          artifact_ci="https://artifact.ci/gh/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## E2E Test: \`${{ matrix.model }}\`
 
-          | Artifact | Link |
+          | Artifact | |
           |----------|------|
-          | HTML Report | [Download](${report_url}) |
-          | Sandbox | [Download](${sandbox_url}) |
+          | HTML Report | [View](${artifact_ci}) |
+          | Sandbox | [View](${artifact_ci}) |
+          | All artifacts | [Download](${run_url}) |
           EOF
