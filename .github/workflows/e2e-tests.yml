@@ -1,0 +1,88 @@
+name: E2E Tests (dev-record)
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Model tiers to test (comma-separated)
+        type: choice
+        options:
+          - weakest
+          - mid
+          - strongest
+          - weakest,mid
+          - weakest,mid,strongest
+        default: weakest
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          matrix=$(echo '${{ inputs.models }}' | jq -Rc 'split(",") | map(ltrimstr(" ") | rtrimstr(" ")) | {model: .}')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Install test dependencies
+        run: pip install ./tests
+
+      - name: Run E2E tests
+        run: |
+          pytest tests/skills/dev-record/test_full_workflow.py \
+            --model ${{ matrix.model }} \
+            --basetemp "$GITHUB_WORKSPACE/.pytest-tmp" \
+            -v
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ matrix.model }}
+          path: tests/reports/*${{ matrix.model }}*.html
+          if-no-files-found: ignore
+
+      - name: Upload sandbox
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-${{ matrix.model }}
+          path: .pytest-tmp/
+          if-no-files-found: ignore
+
+      - name: Job summary
+        if: always()
+        run: |
+          artifact_url="https://artifact.ci/gh/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## E2E Test: \`${{ matrix.model }}\`
+
+          | Artifact | Link |
+          |----------|------|
+          | HTML Report | [View on artifact.ci](${artifact_url}) |
+          | Sandbox | [Download from Actions artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          EOF

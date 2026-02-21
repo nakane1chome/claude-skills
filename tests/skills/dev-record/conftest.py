@@ -303,7 +303,11 @@ class _AuditHelpers:
             if t == "plan_snapshot":
                 plan_file = c.get("plan_file", "")
                 if plan_file:
-                    return f'plan_snapshot: <a href="file://{h(plan_file)}">{h(Path(plan_file).name)}</a>'
+                    try:
+                        rel = Path(plan_file).relative_to(project_dir)
+                    except ValueError:
+                        rel = Path(plan_file).name
+                    return f'plan_snapshot: <a href="{h(str(rel))}">{h(Path(plan_file).name)}</a>'
                 return "plan_snapshot"
             return h(t)
 
@@ -497,11 +501,10 @@ class _AuditHelpers:
                     connector = "\u2514\u2500 " if is_last else "\u251c\u2500 "
                     child = node[name]
                     if isinstance(child, str):
-                        # Leaf file
-                        abs_path = (project_dir / child).resolve()
+                        # Leaf file — child is already relative to project_dir
                         lines.append(
                             f'{h(prefix)}{connector}'
-                            f'<a href="file://{abs_path}">{h(name)}</a>'
+                            f'<a href="{h(child)}">{h(name)}</a>'
                         )
                     else:
                         # Directory
