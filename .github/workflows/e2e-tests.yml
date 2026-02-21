@@ -89,11 +89,12 @@ jobs:
       - name: Job summary
         if: always()
         run: |
-          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          aci="https://www.artifact.ci/artifact/view/${{ github.repository }}/run/${{ github.run_id }}.1"
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## E2E Test: \`${{ matrix.model }}\`
 
-          Artifacts: [Download from run page](${run_url})
-          - **report-${{ matrix.model }}** — HTML session report
-          - **sandbox-${{ matrix.model }}** — project directory with audit trail
+          | Artifact | |
+          |----------|------|
+          | HTML Report | [View](${aci}/report-${{ matrix.model }}) |
+          | Sandbox | [View](${aci}/sandbox-${{ matrix.model }}) |
           EOF
