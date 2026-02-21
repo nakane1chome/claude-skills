@@ -59,9 +59,10 @@ jobs:
           pytest tests/skills/dev-record/test_full_workflow.py \
             --model ${{ matrix.model }} \
             --basetemp "$GITHUB_WORKSPACE/.pytest-tmp" \
-            -v --tb=long
+            -v
 
       - name: Upload HTML report
+        id: upload-report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -69,7 +70,14 @@ jobs:
           path: tests/reports/*${{ matrix.model }}*.html
           if-no-files-found: ignore
 
+      - name: Sanitize sandbox filenames
+        if: always()
+        run: |
+          # upload-artifact rejects colons in paths (Windows compat)
+          find .pytest-tmp/ -name '*:*' -exec bash -c 'mv "$1" "${1//:/-}"' _ {} \; 2>/dev/null || true
+
       - name: Upload sandbox
+        id: upload-sandbox
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -81,12 +89,14 @@ jobs:
       - name: Job summary
         if: always()
         run: |
-          artifact_url="https://artifact.ci/gh/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          report_url="${run_url}/artifacts/${{ steps.upload-report.outputs.artifact-id }}"
+          sandbox_url="${run_url}/artifacts/${{ steps.upload-sandbox.outputs.artifact-id }}"
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## E2E Test: \`${{ matrix.model }}\`
 
           | Artifact | Link |
           |----------|------|
-          | HTML Report | [View on artifact.ci](${artifact_url}) |
-          | Sandbox | [Download from Actions artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          | HTML Report | [Download](${report_url}) |
+          | Sandbox | [Download](${sandbox_url}) |
           EOF
