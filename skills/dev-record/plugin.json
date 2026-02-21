@@ -1,0 +1,4 @@
+{
+  "name": "dev-record",
+  "description": "Record agent activity during Claude Code sessions. Captures plans, human input, agent decisions, and deviations via hooks and agent self-reporting."
+}

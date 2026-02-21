@@ -2,42 +2,41 @@
 name: dev-record
 description: Record agent activity during Claude Code sessions. Captures plans, human input, agent decisions, and deviations via hooks and agent self-reporting.
 disable-model-invocation: true
-argument-hint: install|status
+argument-hint: setup|status
 ---
 
 # Dev Record
 
-Run the action specified by `$ARGUMENTS` (either `install` or `status`).
+Run the action specified by `$ARGUMENTS` (either `setup` or `status`).
 
 Passive recording of agent activity during Claude Code sessions. Captures what was planned, what happened, what was decided, and where the agent deviated.
 
 > **Note**: This is a record-only skill — it stores raw data but does not compute trends or analysis. Consumers (other skills, scripts, or humans) interpret the records.
 
+> **Plugin model**: Hooks are registered declaratively via `plugin.json` + `hooks/hooks.json`. When loaded as a plugin (`--plugin-dir`), Claude Code auto-registers all hooks — no manual installation into `.claude/settings.json` required.
+
 ## Actions
 
-### `install`
+### `setup`
 
-Set up passive recording in the current project.
+Initialize the current project for dev-record.
 
 Run `./install.sh` from this skill's directory.
 
 The script:
-1. Verifies `jq` is installed
-2. Copies the 4 hook scripts to `.claude/hooks/dev-record/`
-3. Merges hook configuration into `.claude/settings.json` (appends to existing hooks)
-4. Adds `audit/ops_record/` to `.gitignore`
-5. Appends agent self-reporting guidance to `CLAUDE.md`
-6. Creates `audit/ops_record/` and `audit/dev_record/` directories
+1. Adds `audit/ops_record/` to `.gitignore`
+2. Appends agent self-reporting guidance to `CLAUDE.md`
+3. Creates `audit/ops_record/` and `audit/dev_record/` directories
+
+Hooks are loaded automatically when the plugin is active — this action only sets up project-level files.
 
 ### `status`
 
 Report the current state of dev-record in the project.
 
-1. Check `.claude/settings.json` for dev-record hook entries — report whether hooks are installed
-2. Check `.claude/hooks/dev-record/` — report whether all 4 scripts are present
-3. Check `.gitignore` includes `audit/ops_record/`
-4. Count `.json` summary files in `audit/dev_record/` — report number of recorded sessions
-5. Read the most recent `.json` summary file (by filename sort) and display it
+1. Check `.gitignore` includes `audit/ops_record/`
+2. Count `.json` summary files in `audit/dev_record/` — report number of recorded sessions
+3. Read the most recent `.json` summary file (by filename sort) and display it
 
 ---
 
@@ -152,7 +151,7 @@ Format (one JSON object per line — shown pretty-printed for readability):
 
 ### Hook Scripts
 
-Source scripts are in the `hooks/` directory within this skill.
+Scripts live in `hooks/` within this plugin directory. When loaded via `--plugin-dir`, Claude Code resolves `${CLAUDE_PLUGIN_ROOT}/hooks/` to find them — no copying into the project required.
 
 | Script | Hook Event | Purpose |
 |--------|------------|---------|

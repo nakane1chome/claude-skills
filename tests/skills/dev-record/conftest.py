@@ -20,12 +20,11 @@ import pytest
 
 @pytest.fixture
 async def installed_project(sandbox_project, claude_query):
-    """Sandbox project with dev-record fully installed via install.sh (direct subprocess)."""
+    """Sandbox project with dev-record set up via install.sh + plugin model for hooks."""
     project = sandbox_project
 
-    # Run the dev-record install.sh directly (not via the agent) for reliability.
-    # The agent would need to interpret the SKILL.md and run the script, which is
-    # unreliable with weaker models and wastes API tokens for setup.
+    # Run install.sh for project init (.gitignore, CLAUDE.md, audit dirs).
+    # Hooks are registered via the plugin model, not install.sh.
     install_script = project / ".claude" / "skills" / "dev-record" / "install.sh"
     assert install_script.is_file(), f"install.sh not found at {install_script}"
 
@@ -41,25 +40,21 @@ async def installed_project(sandbox_project, claude_query):
         },
     )
 
-    # Verify the install produced expected artifacts
-    hooks_dir = project / ".claude" / "hooks" / "dev-record"
-    assert hooks_dir.is_dir(), f"hooks dir missing: {hooks_dir}"
-    expected_scripts = [
-        "record-prompt.sh",
-        "record-tool-call.sh",
-        "record-tool-result.sh",
-        "finalize-session.sh",
-    ]
-    for script in expected_scripts:
-        assert (hooks_dir / script).is_file(), f"missing hook: {script}"
-
-    settings = project / ".claude" / "settings.json"
-    assert settings.is_file(), "settings.json missing after install"
-
+    # Verify project init artifacts
     assert (project / "audit" / "dev_record").is_dir(), "audit/dev_record/ missing"
     assert (project / "audit" / "ops_record").is_dir(), "audit/ops_record/ missing"
 
-    yield project, claude_query
+    # Verify plugin structure exists
+    plugin_dir = project / ".claude" / "skills" / "dev-record"
+    assert (plugin_dir / "plugin.json").is_file(), "plugin.json missing"
+    assert (plugin_dir / "hooks" / "hooks.json").is_file(), "hooks/hooks.json missing"
+
+    # Wrap claude_query to inject plugin
+    async def _query_with_plugin(prompt, **overrides):
+        overrides.setdefault("plugins", [{"type": "local", "path": str(plugin_dir)}])
+        return await claude_query(prompt, **overrides)
+
+    yield project, _query_with_plugin
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +69,8 @@ class _AuditHelpers:
     @staticmethod
     def finalize(project_dir: Path, session_id: str) -> None:
         """Manually invoke finalize-session.sh for a given session."""
-        script = project_dir / ".claude" / "hooks" / "dev-record" / "finalize-session.sh"
+        # Plugin model: scripts live in the skill/plugin directory
+        script = project_dir / ".claude" / "skills" / "dev-record" / "hooks" / "finalize-session.sh"
         if not script.is_file():
             raise FileNotFoundError(f"finalize script not found: {script}")
 
