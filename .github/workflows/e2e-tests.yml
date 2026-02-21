@@ -1,6 +1,8 @@
 name: E2E Tests (dev-record)
 
 on:
+  push:
+    branches: [dev-record-plugin]
   workflow_dispatch:
     inputs:
       models:
@@ -22,7 +24,8 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          matrix=$(echo '${{ inputs.models }}' | jq -Rc 'split(",") | map(ltrimstr(" ") | rtrimstr(" ")) | {model: .}')
+          models='${{ inputs.models || 'weakest' }}'
+          matrix=$(echo "$models" | jq -Rc 'split(",") | map(ltrimstr(" ") | rtrimstr(" ")) | {model: .}')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   test:
