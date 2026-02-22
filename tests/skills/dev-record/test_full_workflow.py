@@ -41,10 +41,6 @@ Important: Do not fix any pre-existing test failures. Only add the new language 
 
 
 async def test_full_workflow(installed_project, sdk, audit, model, model_alias, request, report):
-    if "haiku" in model:
-        request.node.add_marker(pytest.mark.xfail(
-            reason="Haiku is too weak for reliable multi-step tool use"))
-
     project_dir, claude_query = installed_project
 
     report.configure(project_dir=project_dir, model=model, model_alias=model_alias,
