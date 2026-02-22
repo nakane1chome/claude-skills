@@ -7,6 +7,7 @@ dependencies = [
     "claude-agent-sdk",
     "pytest",
     "pytest-asyncio",
+    "pytest-html",
 ]
 
 [tool.pytest.ini_options]
