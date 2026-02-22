@@ -56,7 +56,7 @@ jobs:
         run: |
           pytest tests/skills/dev-record/test_full_workflow.py \
             --model ${{ matrix.model }} \
-            --basetemp "$GITHUB_WORKSPACE/.pytest-tmp" \
+            --basetemp /tmp/pytest-sandbox \
             -v -s
 
       - name: Upload report
@@ -75,7 +75,7 @@ jobs:
         if: always()
         run: |
           # upload-artifact rejects colons in paths (Windows compat)
-          find .pytest-tmp/ -name '*:*' -exec bash -c 'mv "$1" "${1//:/-}"' _ {} \; 2>/dev/null || true
+          find /tmp/pytest-sandbox/ -name '*:*' -exec bash -c 'mv "$1" "${1//:/-}"' _ {} \; 2>/dev/null || true
 
       - name: Upload sandbox
         id: upload-sandbox
@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sandbox-${{ matrix.model }}
-          path: .pytest-tmp/test_full_workflow0/project/
+          path: /tmp/pytest-sandbox/test_full_workflow0/project/
           if-no-files-found: ignore
           include-hidden-files: true
 
