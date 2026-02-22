@@ -103,30 +103,3 @@ jobs:
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "[Report](${aci}/report-${{ matrix.model }}) · [Sandbox](${aci}/sandbox-${{ matrix.model }})" >> "$GITHUB_STEP_SUMMARY"
-
-  summary:
-    needs: [setup, test]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all report artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: report-*
-          path: reports/
-
-      - name: Cross-model summary
-        run: |
-          echo "## E2E Test Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
-          found=false
-          for md_file in $(find reports/ -name '*.summary.md' | sort); do
-            found=true
-            cat "$md_file" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-          done
-
-          if [ "$found" = false ]; then
-            echo "_No metrics collected from any model._" >> "$GITHUB_STEP_SUMMARY"
-          fi
