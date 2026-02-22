@@ -135,7 +135,9 @@ jobs:
           restore-keys: pages-site-
 
       - name: Ensure site directory
-        run: mkdir -p site/runs
+        run: |
+          mkdir -p site/runs
+          touch site/.nojekyll
 
       - name: Download report artifacts
         uses: actions/download-artifact@v4
