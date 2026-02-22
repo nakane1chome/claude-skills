@@ -1,0 +1,204 @@
+name: E2E Tests (dev-record)
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Model tiers to test (comma-separated)
+        type: choice
+        options:
+          - weakest
+          - mid
+          - strongest
+          - weakest,mid
+          - weakest,mid,strongest
+        default: weakest
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          models='${{ inputs.models || 'weakest' }}'
+          matrix=$(echo "$models" | jq -Rc 'split(",") | map(ltrimstr(" ") | rtrimstr(" ")) | {model: .}')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Install test dependencies
+        run: pip install ./tests
+
+      - name: Run E2E tests
+        run: |
+          pytest tests/skills/dev-record/ \
+            --model ${{ matrix.model }} \
+            --basetemp /tmp/pytest-sandbox \
+            --html tests/reports/pytest-${{ matrix.model }}.html \
+            --self-contained-html \
+            -v -s
+
+      - name: Upload report
+        id: upload-report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ matrix.model }}
+          path: tests/reports/*${{ matrix.model }}*
+          if-no-files-found: ignore
+
+      - name: Sanitize sandbox filenames
+        if: always()
+        run: |
+          # upload-artifact rejects colons in paths (Windows compat)
+          find /tmp/pytest-sandbox/ -name '*:*' -exec bash -c 'mv "$1" "${1//:/-}"' _ {} \; 2>/dev/null || true
+
+      - name: Upload sandbox
+        id: upload-sandbox
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-${{ matrix.model }}
+          path: /tmp/pytest-sandbox/test_full_workflow0/project/
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+      - name: Job summary
+        if: always()
+        run: |
+          aci="https://www.artifact.ci/artifact/view/${{ github.repository }}/run/${{ github.run_id }}.1"
+          md_file=$(ls tests/reports/*${{ matrix.model }}*.summary.md 2>/dev/null | head -1)
+
+          if [ -n "$md_file" ]; then
+            cat "$md_file" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## \`${{ matrix.model }}\` — skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No metrics collected (test may have been skipped or failed before reporting)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Report](${aci}/report-${{ matrix.model }}) · [Sandbox](${aci}/sandbox-${{ matrix.model }})" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore site history
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: site
+          key: pages-site-${{ github.run_id }}
+          restore-keys: pages-site-
+
+      - name: Ensure site directory
+        run: |
+          mkdir -p site/runs
+          touch site/.nojekyll
+
+      - name: Download report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: report-*
+          path: artifacts/reports
+
+      - name: Download sandbox artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sandbox-*
+          path: artifacts/sandboxes
+
+      - name: Assemble run directory
+        run: |
+          run_dir="site/runs/${{ github.run_id }}"
+          mkdir -p "$run_dir"
+
+          # Process each report artifact (named report-{model})
+          for report_dir in artifacts/reports/report-*/; do
+            [ -d "$report_dir" ] || continue
+            model=$(basename "$report_dir" | sed 's/^report-//')
+            mkdir -p "$run_dir/$model"
+            cp "$report_dir"/* "$run_dir/$model/" 2>/dev/null || true
+
+            # Post-process custom HTML report: prefix sandbox/ to href attributes
+            # so file tree links resolve correctly on Pages
+            for report in "$run_dir/$model"/skills-*.html; do
+              [ -f "$report" ] || continue
+              sed -i 's|href="|href="sandbox/|g' "$report"
+            done
+          done
+
+          # Process each sandbox artifact (named sandbox-{model})
+          for sandbox_dir in artifacts/sandboxes/sandbox-*/; do
+            [ -d "$sandbox_dir" ] || continue
+            model=$(basename "$sandbox_dir" | sed 's/^sandbox-//')
+            mkdir -p "$run_dir/$model/sandbox"
+            cp -r "$sandbox_dir"/* "$run_dir/$model/sandbox/" 2>/dev/null || true
+          done
+
+          echo "Assembled run directory:"
+          ls -la "$run_dir"/*/
+
+      - name: Generate index
+        run: python .github/scripts/generate-pages-index.py site/
+
+      - name: Save site history
+        uses: actions/cache/save@v4
+        with:
+          path: site
+          key: pages-site-${{ github.run_id }}
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
