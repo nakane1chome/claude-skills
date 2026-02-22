@@ -244,6 +244,73 @@ class _SDKHelpers:
                 }
         return {}
 
+    def log_phase(self, phase: str, messages: list, project_dir: Path) -> None:
+        """Print a compact phase summary for CI log visibility.
+
+        Outputs session info, metrics, tool calls (from ops events if
+        available), project file listing, and response tail.
+        """
+        result = self.result(messages)
+        m = self.metrics(messages)
+        usage = m.get("usage", {})
+        dur = m.get("duration_ms", 0)
+        turns = m.get("num_turns", 0)
+        cost = m.get("total_cost_usd")
+
+        print(f"\n{'='*60}")
+        print(f"Phase: {phase}")
+        print(f"  session: {result.session_id if result else '?'}")
+        print(f"  turns: {turns}  duration: {dur/1000:.1f}s  cost: ${cost:.4f}" if cost else
+              f"  turns: {turns}  duration: {dur/1000:.1f}s")
+        print(f"  tokens: {usage.get('input_tokens', 0):,} in / {usage.get('output_tokens', 0):,} out")
+
+        # Summarize tool calls from ops events (if audit dir exists)
+        sid = result.session_id if result else None
+        ops_dir = project_dir / "audit" / "ops_record"
+        if sid and ops_dir.is_dir():
+            ops_files = list(ops_dir.glob(f"*-{sid}.jsonl"))
+            if ops_files:
+                tool_calls = []
+                for line in ops_files[0].read_text().strip().splitlines():
+                    try:
+                        ev = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if ev.get("type") == "tool_call":
+                        tool = ev["content"]["tool"]
+                        inp = ev["content"].get("input", {})
+                        if tool in ("Write", "Edit"):
+                            detail = inp.get("file_path", "?")
+                        elif tool == "Bash":
+                            cmd = inp.get("command", "")
+                            detail = cmd[:80] + ("..." if len(cmd) > 80 else "")
+                        else:
+                            detail = ""
+                        tool_calls.append(f"{tool}({detail})" if detail else tool)
+                if tool_calls:
+                    print(f"  tools: {', '.join(tool_calls)}")
+
+        # Show project files (excluding internals)
+        exclude = {".git", ".claude", "__pycache__", ".pytest_cache", "audit"}
+        files = sorted(
+            str(p.relative_to(project_dir))
+            for p in project_dir.rglob("*")
+            if p.is_file() and not any(part in exclude for part in p.relative_to(project_dir).parts)
+        )
+        if files:
+            print(f"  project files: {', '.join(files)}")
+        else:
+            print("  project files: (none)")
+
+        # Show last 300 chars of model response
+        text = self.text(messages)
+        if text:
+            snippet = text[-300:].strip()
+            if len(text) > 300:
+                snippet = "..." + snippet
+            print(f"  response tail: {snippet}")
+        print(f"{'='*60}")
+
 
 @pytest.fixture(scope="session")
 def sdk():

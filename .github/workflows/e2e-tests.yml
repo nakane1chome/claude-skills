@@ -57,7 +57,7 @@ jobs:
           pytest tests/skills/dev-record/test_full_workflow.py \
             --model ${{ matrix.model }} \
             --basetemp "$GITHUB_WORKSPACE/.pytest-tmp" \
-            -v
+            -v -s
 
       - name: Upload report
         id: upload-report

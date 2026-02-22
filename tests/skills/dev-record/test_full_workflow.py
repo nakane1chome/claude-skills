@@ -64,6 +64,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     assert plan_session_id is not None, "No session_id from plan phase"
     session_ids.append(plan_session_id)
     report.add(plan_session_id, sdk.metrics(plan_messages), phase="Plan")
+    sdk.log_phase("Plan", plan_messages, project_dir)
 
     # ------------------------------------------------------------------
     # Phase 1b — Implement (fresh session, cleared context)
@@ -80,10 +81,15 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     impl_session_id = impl_result.session_id
     session_ids.append(impl_session_id)
     report.add(impl_session_id, sdk.metrics(impl_messages), phase="Implement")
+    sdk.log_phase("Implement", impl_messages, project_dir)
 
     # Verify at least one test file was created
     test_files = list(project_dir.glob("**/test_*.py"))
-    assert len(test_files) >= 1, "No test_*.py file created during implementation"
+    assert len(test_files) >= 1, (
+        f"No test_*.py file created during implementation. "
+        f"project_dir={project_dir}, "
+        f"all files: {[str(p.relative_to(project_dir)) for p in project_dir.rglob('*') if p.is_file() and '.git' not in p.parts]}"
+    )
 
     # ------------------------------------------------------------------
     # Phase 2 — External modification (break a test)
@@ -116,6 +122,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     extend_session_id = extend_result.session_id
     session_ids.append(extend_session_id)
     report.add(extend_session_id, sdk.metrics(extend_messages), phase="Extend")
+    sdk.log_phase("Extend", extend_messages, project_dir)
 
     # ------------------------------------------------------------------
     # Audit verification
