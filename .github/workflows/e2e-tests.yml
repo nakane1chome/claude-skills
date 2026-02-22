@@ -63,7 +63,7 @@ jobs:
 
       - name: Run E2E tests
         run: |
-          pytest tests/skills/dev-record/test_full_workflow.py \
+          pytest tests/skills/dev-record/ \
             --model ${{ matrix.model }} \
             --basetemp /tmp/pytest-sandbox \
             --html tests/reports/pytest-${{ matrix.model }}.html \
