@@ -62,11 +62,12 @@ jobs:
         run: pip install ./tests
 
       - name: Run E2E tests
+        working-directory: tests
         run: |
-          pytest tests/skills/ \
+          pytest skills/ \
             --model ${{ matrix.model }} \
             --basetemp /tmp/pytest-sandbox \
-            --html tests/reports/pytest-${{ matrix.model }}.html \
+            --html reports/pytest-${{ matrix.model }}.html \
             --self-contained-html \
             -v -s
 
