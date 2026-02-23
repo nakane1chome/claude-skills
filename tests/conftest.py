@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import os
 import shutil
@@ -390,8 +391,13 @@ class _ReportCollector:
         reports_dir.mkdir(exist_ok=True)
         stem = f"{test_dir.as_posix().replace('/', '-')}-{test_name}-{self._model_alias}"
 
-        # HTML audit report (optional — requires a generator, e.g. from dev-record)
-        stable_html = None
+        # JSON + Markdown metrics (always generated)
+        metrics = self._build_metrics()
+        json_path = self._write_json(reports_dir, stem, metrics)
+        self._write_summary_md(reports_dir, stem, metrics)
+
+        # HTML report — custom generator (e.g. dev-record audit) or default
+        stable_html = reports_dir / f"{stem}.html"
         if self._html_generator:
             report_path = self._project_dir / "test-report.html"
             self._html_generator(
@@ -399,20 +405,15 @@ class _ReportCollector:
                 model=self._model, title=self._title,
                 session_metrics=self.session_metrics,
             )
-            stable_html = reports_dir / f"{stem}.html"
             shutil.copy2(report_path, stable_html)
-
-        # JSON + Markdown metrics (always generated)
-        metrics = self._build_metrics()
-        json_path = self._write_json(reports_dir, stem, metrics)
-        self._write_summary_md(reports_dir, stem, metrics)
+        else:
+            self._write_default_html(stable_html, metrics)
 
         # Track generated report paths for pytest-html linking
         self.report_paths["json"] = json_path
-        if stable_html:
-            self.report_paths["report"] = stable_html
+        self.report_paths["report"] = stable_html
 
-        return stable_html or json_path
+        return stable_html
 
     def _build_metrics(self) -> dict:
         """Build the structured metrics payload from collected sessions."""
@@ -487,6 +488,91 @@ class _ReportCollector:
         md_path = reports_dir / f"{stem}.summary.md"
         md_path.write_text("\n".join(lines) + "\n")
         return md_path
+
+    def _write_default_html(self, output_path: Path, metrics: dict) -> None:
+        """Generate a default HTML report from session metrics and custom data."""
+        from datetime import datetime, timezone
+
+        h = html.escape
+        title = self._title or "Test Report"
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        sessions = metrics["sessions"]
+        totals = metrics["totals"]
+
+        parts: list[str] = []
+        parts.append(f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>{h(title)}</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 1100px; margin: 0 auto; padding: 24px; color: #1f2937; }}
+  h1 {{ border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }}
+  h2 {{ margin-top: 32px; color: #374151; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
+  th, td {{ border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; font-size: 14px; }}
+  th {{ background: #f3f4f6; font-weight: 600; }}
+  tr:nth-child(even) {{ background: #f9fafb; }}
+  .meta {{ color: #6b7280; font-size: 13px; }}
+  .mono {{ font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+           font-size: 13px; }}
+  .stat-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+               gap: 12px; margin: 16px 0; }}
+  .stat-card {{ background: #f3f4f6; border-radius: 8px; padding: 12px 16px; }}
+  .stat-card .label {{ font-size: 12px; color: #6b7280; text-transform: uppercase; }}
+  .stat-card .value {{ font-size: 24px; font-weight: 700; }}
+</style></head><body>
+<h1>{h(title)}</h1>
+<p class="meta">Generated: {h(now)}
+  | Model: {h(self._model or '?')} ({h(self._model_alias or '?')})
+  | Sessions: {len(sessions)}</p>
+""")
+
+        # Summary stats
+        parts.append('<div class="stat-grid">')
+        parts.append(f'<div class="stat-card"><div class="label">Total Turns</div>'
+                     f'<div class="value">{totals["num_turns"]}</div></div>')
+        parts.append(f'<div class="stat-card"><div class="label">Duration</div>'
+                     f'<div class="value">{totals["duration_s"]}s</div></div>')
+        parts.append(f'<div class="stat-card"><div class="label">Cost</div>'
+                     f'<div class="value">${totals["cost_usd"]:.4f}</div></div>')
+        parts.append(f'<div class="stat-card"><div class="label">Input Tokens</div>'
+                     f'<div class="value">{totals["input_tokens"]:,}</div></div>')
+        parts.append(f'<div class="stat-card"><div class="label">Output Tokens</div>'
+                     f'<div class="value">{totals["output_tokens"]:,}</div></div>')
+        parts.append('</div>')
+
+        # Sessions table
+        parts.append("<h2>Sessions</h2>")
+        parts.append("<table><tr>")
+        parts.append("<th>#</th><th>Phase</th><th>Session ID</th>"
+                     "<th>Turns</th><th>In Tokens</th><th>Out Tokens</th>"
+                     "<th>Cost</th><th>Duration</th>")
+        parts.append("</tr>")
+        for i, s in enumerate(sessions, 1):
+            cost_str = f"${s['cost_usd']:.4f}" if s["cost_usd"] else "$0"
+            parts.append(f"""<tr>
+<td>{i}</td>
+<td>{h(s.get('phase') or '-')}</td>
+<td class="mono">{h(s['session_id'][:12])}</td>
+<td>{s['num_turns']}</td>
+<td class="mono">{s['input_tokens']:,}</td>
+<td class="mono">{s['output_tokens']:,}</td>
+<td class="mono">{cost_str}</td>
+<td class="mono">{s['duration_s']}s</td>
+</tr>""")
+        parts.append("</table>")
+
+        # Custom sections
+        for section_key, section_data in metrics.get("custom", {}).items():
+            section_title = section_key.replace("_", " ").title()
+            parts.append(f"<h2>{h(section_title)}</h2>")
+            parts.append("<table><tr><th>Metric</th><th>Value</th></tr>")
+            for k, v in section_data.items():
+                parts.append(f"<tr><td>{h(str(k))}</td><td class='mono'>{h(str(v))}</td></tr>")
+            parts.append("</table>")
+
+        parts.append("</body></html>")
+        output_path.write_text("\n".join(parts))
 
 
 @pytest.fixture
