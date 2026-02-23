@@ -21,11 +21,14 @@ dependencies = [
 asyncio_mode = "auto"
 
 [project.scripts]
-ablation = "ablation.cli:main"
+ablation = "tools.ablation.cli:main"
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["tools*"]
 
 [project.optional-dependencies]
 neural = ["sentence-transformers>=2.2"]
