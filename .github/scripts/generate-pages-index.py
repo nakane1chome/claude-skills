@@ -186,7 +186,8 @@ def generate_index(site_dir: Path) -> None:
 
         for run in runs:
             run_id = run["run_id"]
-            date = run["meta"].get("date", "-")
+            ts = run["meta"].get("timestamp", "")
+            date = ts[:16].replace("T", " ") if ts else run["meta"].get("date", "-")
             parts.append("<tr>")
             parts.append(f'<td class="mono">{h(run_id)}</td>')
             parts.append(f'<td class="mono">{h(date)}</td>')
