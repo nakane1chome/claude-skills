@@ -12,6 +12,7 @@ import pytest
 from tools.ablation.chunker import chunk_markdown
 from tools.ablation.embedder import TfidfEmbedder
 from tools.ablation.matcher import greedy_match
+from tools.ablation.reporter import ablation_metrics
 from tools.ablation.scorer import score_document
 
 
@@ -82,17 +83,8 @@ async def test_review_preserves_vocabulary(
     # Run ablation analysis
     score = _run_ablation(input_text, output_text)
 
-    # Log ablation metrics for diagnostics
-    print(f"\n{'='*60}")
-    print("Ablation Analysis:")
-    print(f"  coverage: {score.coverage:.3f}")
-    print(f"  mean_lexical_overlap: {score.mean_lexical_overlap:.3f}")
-    print(f"  mean_semantic_similarity: {score.mean_semantic_similarity:.3f}")
-    print(f"  mean_ablation_risk: {score.mean_ablation_risk:.3f}")
-    print(f"  mean_freq_shift: {score.mean_freq_shift:.1f}")
-    print(f"  matched: {score.total_input_concepts - score.unmatched_count}"
-          f"/{score.total_input_concepts}")
-    print(f"{'='*60}")
+    # Attach ablation metrics to the shared report
+    report.add_custom("ablation", ablation_metrics(score, "preserve"))
 
     # Preserve mode: review should fix language without replacing vocabulary.
     # Thresholds are slightly relaxed vs the static fixture tests because

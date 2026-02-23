@@ -20,6 +20,11 @@ from claude_agent_sdk import (
 from claude_agent_sdk._errors import MessageParseError
 from claude_agent_sdk import _internal as _sdk_internal
 
+try:
+    from pytest_html import extras as _html_extras
+except ImportError:
+    _html_extras = None
+
 # ---------------------------------------------------------------------------
 # Patch SDK message parser to skip unknown message types (e.g. rate_limit_event)
 # instead of crashing the generator mid-stream.
@@ -315,3 +320,202 @@ class _SDKHelpers:
 @pytest.fixture(scope="session")
 def sdk():
     return _SDKHelpers()
+
+
+# ---------------------------------------------------------------------------
+# report fixture — collects session metrics, generates JSON/MD/HTML reports
+# ---------------------------------------------------------------------------
+
+
+class _ReportCollector:
+    """Collects session metrics during a test, generates report on finalize.
+
+    Always produces JSON + Markdown summary reports.  HTML audit reports are
+    optional — call ``set_html_generator`` to enable them (e.g. from
+    dev-record's conftest which has access to audit data).
+    """
+
+    def __init__(self):
+        self.session_metrics: dict[str, dict] = {}
+        self.report_paths: dict[str, Path] = {}
+        self._sessions: list[dict] = []  # ordered list with phase labels
+        self._custom: dict[str, dict] = {}
+        self._project_dir: Path | None = None
+        self._model: str | None = None
+        self._model_alias: str | None = None
+        self._title: str | None = None
+        self._test_file: Path | None = None
+        self._html_generator = None
+
+    def configure(self, *, project_dir: Path, model: str, model_alias: str,
+                  title: str, test_file: Path) -> None:
+        self._project_dir = project_dir
+        self._model = model
+        self._model_alias = model_alias
+        self._title = title
+        self._test_file = test_file
+
+    def set_html_generator(self, fn) -> None:
+        """Set an optional HTML report generator.
+
+        Signature: fn(project_dir, output_path, *, model, title, session_metrics)
+        """
+        self._html_generator = fn
+
+    def add(self, session_id: str, metrics: dict, *, phase: str | None = None) -> None:
+        self.session_metrics[session_id] = metrics
+        self._sessions.append({
+            "session_id": session_id,
+            "phase": phase,
+            "metrics": metrics,
+        })
+
+    def add_custom(self, key: str, data: dict) -> None:
+        """Attach domain-specific metrics under *key*.
+
+        Multiple calls with different keys accumulate; same key overwrites.
+        """
+        self._custom[key] = data
+
+    def finalize(self) -> Path | None:
+        if self._project_dir is None or self._test_file is None:
+            return None
+
+        # Compute stable output paths
+        test_dir = self._test_file.resolve().parent.relative_to(
+            self._test_file.resolve().parent.parent.parent
+        )
+        test_name = self._test_file.stem.removeprefix("test_")
+        reports_dir = self._test_file.resolve().parent.parent.parent / "reports"
+        reports_dir.mkdir(exist_ok=True)
+        stem = f"{test_dir.as_posix().replace('/', '-')}-{test_name}-{self._model_alias}"
+
+        # HTML audit report (optional — requires a generator, e.g. from dev-record)
+        stable_html = None
+        if self._html_generator:
+            report_path = self._project_dir / "test-report.html"
+            self._html_generator(
+                self._project_dir, report_path,
+                model=self._model, title=self._title,
+                session_metrics=self.session_metrics,
+            )
+            stable_html = reports_dir / f"{stem}.html"
+            shutil.copy2(report_path, stable_html)
+
+        # JSON + Markdown metrics (always generated)
+        metrics = self._build_metrics()
+        json_path = self._write_json(reports_dir, stem, metrics)
+        self._write_summary_md(reports_dir, stem, metrics)
+
+        # Track generated report paths for pytest-html linking
+        self.report_paths["json"] = json_path
+        if stable_html:
+            self.report_paths["report"] = stable_html
+
+        return stable_html or json_path
+
+    def _build_metrics(self) -> dict:
+        """Build the structured metrics payload from collected sessions."""
+        sessions_json = []
+        for s in self._sessions:
+            m = s["metrics"]
+            usage = m.get("usage", {})
+            sessions_json.append({
+                "phase": s["phase"],
+                "session_id": s["session_id"],
+                "num_turns": m.get("num_turns", 0),
+                "duration_s": round(m.get("duration_ms", 0) / 1000, 1),
+                "cost_usd": m.get("total_cost_usd", 0) or 0,
+                "input_tokens": usage.get("input_tokens", 0),
+                "output_tokens": usage.get("output_tokens", 0),
+            })
+
+        totals = {
+            "num_turns": sum(s["num_turns"] for s in sessions_json),
+            "duration_s": round(sum(s["duration_s"] for s in sessions_json), 1),
+            "cost_usd": round(sum(s["cost_usd"] for s in sessions_json), 4),
+            "input_tokens": sum(s["input_tokens"] for s in sessions_json),
+            "output_tokens": sum(s["output_tokens"] for s in sessions_json),
+        }
+
+        out = {
+            "model": self._model,
+            "model_alias": self._model_alias,
+            "sessions": sessions_json,
+            "totals": totals,
+        }
+        if self._custom:
+            out["custom"] = dict(self._custom)
+        return out
+
+    def _write_json(self, reports_dir: Path, stem: str, metrics: dict) -> Path:
+        """Write JSON metrics file for cross-model aggregation in CI."""
+        json_path = reports_dir / f"{stem}.json"
+        json_path.write_text(json.dumps(metrics, indent=2) + "\n")
+        return json_path
+
+    def _write_summary_md(self, reports_dir: Path, stem: str, metrics: dict) -> Path:
+        """Write a Markdown summary snippet for the CI job summary step."""
+        alias = metrics["model_alias"]
+        totals = metrics["totals"]
+        sessions = metrics["sessions"]
+
+        lines = [
+            f"## `{alias}` ({totals['duration_s']}s, ${totals['cost_usd']})",
+            "",
+            "| Phase | Turns | In Tokens | Out Tokens | Cost | Duration |",
+            "|-------|-------|-----------|------------|------|----------|",
+        ]
+        for s in sessions:
+            cost_str = f"${s['cost_usd']:.4f}" if s["cost_usd"] else "$0"
+            lines.append(
+                f"| {s['phase']} | {s['num_turns']} "
+                f"| {s['input_tokens']:,} | {s['output_tokens']:,} "
+                f"| {cost_str} | {s['duration_s']}s |"
+            )
+
+        # Render custom metric sections
+        for section_key, section_data in metrics.get("custom", {}).items():
+            lines.append("")
+            lines.append(f"### {section_key.replace('_', ' ').title()}")
+            lines.append("")
+            lines.append("| Metric | Value |")
+            lines.append("|--------|-------|")
+            for k, v in section_data.items():
+                lines.append(f"| {k} | {v} |")
+
+        md_path = reports_dir / f"{stem}.summary.md"
+        md_path.write_text("\n".join(lines) + "\n")
+        return md_path
+
+
+@pytest.fixture
+def report(request):
+    collector = _ReportCollector()
+    request.node._report_collector = collector
+    yield collector
+    path = collector.finalize()
+    if path:
+        print(f"\nReport: {path}")
+
+
+# ---------------------------------------------------------------------------
+# pytest-html integration — link custom reports from pytest-html rows
+# ---------------------------------------------------------------------------
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    if _html_extras is None:
+        return
+    report = outcome.get_result()
+    if report.when != "teardown":
+        return
+    collector = getattr(item, "_report_collector", None)
+    if collector is None or not collector.report_paths:
+        return
+    extra = getattr(report, "extras", [])
+    for label, path in collector.report_paths.items():
+        extra.append(_html_extras.url(path.name, name=label))
+    report.extras = extra

@@ -12,21 +12,79 @@ import sys
 from pathlib import Path
 
 
-def _load_metrics(model_dir: Path) -> dict | None:
-    """Load the first JSON metrics file found in a model directory."""
-    for f in model_dir.glob("*.json"):
+def _load_meta(run_dir: Path) -> dict:
+    """Read meta.json for run metadata (date, timestamp). Graceful fallback."""
+    meta_path = run_dir / "meta.json"
+    if meta_path.is_file():
         try:
-            return json.loads(f.read_text())
+            return json.loads(meta_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _load_all_metrics(model_dir: Path) -> list[dict]:
+    """Load ALL JSON metrics files in a model directory.
+
+    Returns a list of {stem, metrics} dicts.
+    """
+    results = []
+    for f in sorted(model_dir.glob("*.json")):
+        try:
+            data = json.loads(f.read_text())
         except (json.JSONDecodeError, OSError):
             continue
-    return None
+        if "totals" in data:
+            results.append({"stem": f.stem, "metrics": data})
+    return results
 
 
-def _find_report(model_dir: Path, prefix: str) -> str | None:
-    """Find an HTML report file matching a prefix pattern."""
-    for f in model_dir.glob(f"{prefix}*.html"):
+def _find_reports(model_dir: Path) -> list[dict]:
+    """Find all non-pytest HTML reports with derived labels.
+
+    Label derivation: skills-dev-record-full_workflow-weakest -> dev-record/full_workflow
+    Strip 'skills-' prefix and '-{model_alias}' suffix, join remainder with '/'.
+    """
+    reports = []
+    for f in sorted(model_dir.glob("skills-*.html")):
+        stem = f.stem  # e.g. skills-dev-record-full_workflow-weakest
+        # Strip 'skills-' prefix
+        remainder = stem.removeprefix("skills-")
+        # Strip '-{model_alias}' suffix (last hyphen-separated segment)
+        # Then split skill-dir from test-name at the rightmost hyphen
+        parts = remainder.rsplit("-", 1)
+        if len(parts) == 2:
+            # parts[0] = 'dev-record-full_workflow', parts[1] = model alias
+            # Now split skill name from test name at the last hyphen in parts[0]
+            skill_parts = parts[0].rsplit("-", 1)
+            label = "/".join(skill_parts) if len(skill_parts) == 2 else parts[0]
+        else:
+            label = remainder
+        reports.append({"filename": f.name, "label": label})
+    return reports
+
+
+def _find_pytest_report(model_dir: Path) -> str | None:
+    """Find the single pytest HTML report file."""
+    for f in model_dir.glob("pytest-*.html"):
         return f.name
     return None
+
+
+def _aggregate_totals(all_metrics: list[dict]) -> dict:
+    """Sum totals across multiple metrics files for a single model."""
+    agg = {"num_turns": 0, "duration_s": 0.0, "cost_usd": 0.0,
+           "input_tokens": 0, "output_tokens": 0}
+    for entry in all_metrics:
+        t = entry["metrics"].get("totals", {})
+        agg["num_turns"] += t.get("num_turns", 0)
+        agg["duration_s"] += t.get("duration_s", 0)
+        agg["cost_usd"] += t.get("cost_usd", 0)
+        agg["input_tokens"] += t.get("input_tokens", 0)
+        agg["output_tokens"] += t.get("output_tokens", 0)
+    agg["duration_s"] = round(agg["duration_s"], 1)
+    agg["cost_usd"] = round(agg["cost_usd"], 4)
+    return agg
 
 
 def generate_index(site_dir: Path) -> None:
@@ -53,22 +111,21 @@ def generate_index(site_dir: Path) -> None:
     runs = []
     for rd in run_dirs:
         run_id = rd.name
+        meta = _load_meta(rd)
         models: dict[str, dict] = {}
         for model_name in all_models:
             model_dir = rd / model_name
             if not model_dir.is_dir():
                 continue
-            metrics = _load_metrics(model_dir)
-            custom_report = _find_report(model_dir, "skills-")
-            pytest_report = _find_report(model_dir, "pytest-")
-            has_sandbox = (model_dir / "sandbox").is_dir()
+            all_metrics = _load_all_metrics(model_dir)
+            custom_reports = _find_reports(model_dir)
+            pytest_report = _find_pytest_report(model_dir)
             models[model_name] = {
-                "metrics": metrics,
-                "custom_report": custom_report,
+                "all_metrics": all_metrics,
+                "custom_reports": custom_reports,
                 "pytest_report": pytest_report,
-                "has_sandbox": has_sandbox,
             }
-        runs.append({"run_id": run_id, "models": models})
+        runs.append({"run_id": run_id, "meta": meta, "models": models})
 
     # Generate HTML
     parts: list[str] = []
@@ -116,48 +173,50 @@ def generate_index(site_dir: Path) -> None:
 
         # Runs table
         parts.append("<table><tr>")
-        parts.append("<th>Run ID</th>")
+        parts.append("<th>Run ID</th><th>Date</th>")
         for model in all_models:
             parts.append(f'<th class="model-header" colspan="2">{h(model)}</th>')
         parts.append("</tr>")
 
         # Sub-header row for metrics + links
-        parts.append("<tr><th></th>")
+        parts.append("<tr><th></th><th></th>")
         for _ in all_models:
             parts.append("<th>Metrics</th><th>Links</th>")
         parts.append("</tr>")
 
         for run in runs:
             run_id = run["run_id"]
+            date = run["meta"].get("date", "-")
             parts.append("<tr>")
             parts.append(f'<td class="mono">{h(run_id)}</td>')
+            parts.append(f'<td class="mono">{h(date)}</td>')
             for model in all_models:
                 mdata = run["models"].get(model)
                 if mdata is None:
                     parts.append('<td class="na">-</td><td class="na">-</td>')
                     continue
-                # Metrics cell
-                metrics = mdata["metrics"]
-                if metrics and "totals" in metrics:
-                    t = metrics["totals"]
-                    cost = f"${t.get('cost_usd', 0):.4f}"
-                    dur = f"{t.get('duration_s', 0):.0f}s"
-                    turns = t.get("num_turns", 0)
+                # Metrics cell — aggregate across all JSON files
+                all_metrics = mdata["all_metrics"]
+                if all_metrics:
+                    t = _aggregate_totals(all_metrics)
+                    cost = f"${t['cost_usd']:.4f}"
+                    dur = f"{t['duration_s']:.0f}s"
+                    turns = t["num_turns"]
                     parts.append(
                         f'<td class="mono">{cost} &middot; {dur} &middot; '
                         f'{turns}t</td>'
                     )
                 else:
                     parts.append('<td class="na">no metrics</td>')
-                # Links cell
+                # Links cell — one link per custom report + pytest
                 links: list[str] = []
                 base = f"runs/{run_id}/{model}"
-                if mdata["custom_report"]:
-                    links.append(f'<a href="{base}/{mdata["custom_report"]}">report</a>')
+                for cr in mdata["custom_reports"]:
+                    links.append(
+                        f'<a href="{base}/{cr["filename"]}">{h(cr["label"])}</a>'
+                    )
                 if mdata["pytest_report"]:
                     links.append(f'<a href="{base}/{mdata["pytest_report"]}">pytest</a>')
-                if mdata["has_sandbox"]:
-                    links.append(f'<a href="{base}/sandbox/">sandbox</a>')
                 parts.append(f'<td class="links">{" ".join(links) if links else "-"}</td>')
             parts.append("</tr>")
         parts.append("</table>")

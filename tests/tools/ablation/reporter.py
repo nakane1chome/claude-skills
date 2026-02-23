@@ -66,6 +66,27 @@ def _verdict(
         return "CLEAN", "green"
 
 
+def ablation_metrics(
+    score: DocumentScore, mode: str, thresholds: Thresholds = DEFAULT_THRESHOLDS
+) -> dict[str, Any]:
+    """Build a flat dict of ablation metrics for ``report.add_custom()``."""
+    verdict_text, _ = _verdict(score, mode, thresholds)
+    return {
+        "mode": mode,
+        "verdict": verdict_text,
+        "coverage": round(score.coverage, 4),
+        "mean_lexical_overlap": round(score.mean_lexical_overlap, 4),
+        "mean_ablation_risk": round(score.mean_ablation_risk, 4),
+        "mean_semantic_similarity": round(score.mean_semantic_similarity, 4),
+        "mean_freq_shift": round(score.mean_freq_shift, 2),
+        "concepts": (
+            f"{score.total_input_concepts} in / "
+            f"{score.total_output_concepts} out / "
+            f"{score.unmatched_count} unmatched"
+        ),
+    }
+
+
 def report_terminal(
     score: DocumentScore, mode: str, thresholds: Thresholds = DEFAULT_THRESHOLDS
 ) -> None:
