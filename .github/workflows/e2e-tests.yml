@@ -1,4 +1,4 @@
-name: E2E Tests (dev-record)
+name: E2E Tests
 
 on:
   workflow_dispatch:
@@ -63,7 +63,7 @@ jobs:
 
       - name: Run E2E tests
         run: |
-          pytest tests/skills/dev-record/ \
+          pytest tests/skills/ \
             --model ${{ matrix.model }} \
             --basetemp /tmp/pytest-sandbox \
             --html tests/reports/pytest-${{ matrix.model }}.html \
