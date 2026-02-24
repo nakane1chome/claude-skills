@@ -348,8 +348,15 @@ class _AuditHelpers:
   .trunc-wrap.expanded .trunc-full {{ display: inline; }}
   .trunc-toggle {{ cursor: pointer; color: #2563eb; padding: 0 2px; user-select: none; }}
   .delta {{ color: #9ca3af; font-size: 11px; }}
-  .file-list {{ column-count: 2; font-size: 13px; }}
-  .file-list li {{ margin-bottom: 2px; }}
+  .file-tree {{ font-size: 13px; }}
+  .file-tree ul {{ list-style: none; padding-left: 18px; margin: 0; }}
+  .file-tree > ul {{ padding-left: 0; }}
+  .file-tree li {{ margin: 1px 0; white-space: nowrap; }}
+  .file-tree .dir {{ cursor: pointer; user-select: none; }}
+  .file-tree .dir::before {{ content: "\u25BE "; color: #6b7280; }}
+  .file-tree .dir.collapsed::before {{ content: "\u25B8 "; }}
+  .file-tree .dir.collapsed + ul {{ display: none; }}
+  .file-tree .file {{ color: #374151; padding-left: 2px; }}
   .stat-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
                  gap: 12px; margin: 12px 0; }}
   .stat-card {{ background: #f3f4f6; border-radius: 8px; padding: 12px 16px; }}
@@ -500,24 +507,27 @@ class _AuditHelpers:
                     node = node.setdefault(part, {})
                 node[file_path.name] = f
 
-            def _render_tree(node: dict, prefix: str = "") -> list[str]:
-                lines = []
+            def _render_tree(node: dict) -> str:
+                items = []
                 entries = sorted(node.keys(), key=lambda k: (isinstance(node[k], str), k))
-                for idx, name in enumerate(entries):
-                    is_last = idx == len(entries) - 1
-                    connector = "\u2514\u2500 " if is_last else "\u251c\u2500 "
+                for name in entries:
                     child = node[name]
                     if isinstance(child, str):
                         display = name.replace(":", "-")
-                        lines.append(f'{h(prefix)}{connector}{h(display)}')
+                        items.append(f'<li><span class="file mono">{h(display)}</span></li>')
                     else:
-                        lines.append(f'{h(prefix)}{connector}{h(name)}/')
-                        extension = "\u2502  " if not is_last else "   "
-                        lines.extend(_render_tree(child, prefix + extension))
-                return lines
+                        items.append(
+                            f'<li><span class="dir mono">{h(name)}/</span>'
+                            f'<ul>{_render_tree(child)}</ul></li>'
+                        )
+                return "".join(items)
 
-            tree_lines = _render_tree(tree)
-            parts.append(f'<pre class="mono" style="line-height:1.5">{chr(10).join(tree_lines)}</pre>')
+            parts.append(f'<div class="file-tree"><ul>{_render_tree(tree)}</ul></div>')
+            parts.append("""<script>
+document.querySelectorAll('.file-tree .dir').forEach(function(el){
+  el.addEventListener('click',function(){this.classList.toggle('collapsed')})
+})
+</script>""")
         else:
             parts.append("<p class='meta'>No project files found.</p>")
 
