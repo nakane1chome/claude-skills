@@ -404,6 +404,7 @@ class _ReportCollector:
                 self._project_dir, report_path,
                 model=self._model, title=self._title,
                 session_metrics=self.session_metrics,
+                custom=self._custom,
             )
             shutil.copy2(report_path, stable_html)
         else:

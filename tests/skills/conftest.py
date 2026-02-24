@@ -172,6 +172,7 @@ class _AuditHelpers:
         title: str | None = None,
         model: str | None = None,
         session_metrics: dict[str, dict] | None = None,
+        custom: dict[str, dict] | None = None,
     ) -> Path:
         """Generate a self-contained HTML session report from audit data.
 
@@ -556,6 +557,17 @@ class _AuditHelpers:
             for tool_name, count in sorted(tool_usage.items(), key=lambda x: -x[1]):
                 parts.append(f"<tr><td>{h(tool_name)}</td><td>{count}</td></tr>")
             parts.append("</table>")
+
+        # --- Custom metric sections (e.g. ablation results) ---
+        if custom:
+            for section_key, section_data in custom.items():
+                section_title = section_key.replace("_", " ").title()
+                parts.append(f"<h2>{h(section_title)}</h2>")
+                parts.append("<table><tr><th>Metric</th><th>Value</th></tr>")
+                for k, v in section_data.items():
+                    parts.append(f"<tr><td>{h(str(k))}</td>"
+                                 f"<td class='mono'>{h(str(v))}</td></tr>")
+                parts.append("</table>")
 
         parts.append("</body></html>")
 
