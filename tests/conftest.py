@@ -346,6 +346,7 @@ class _ReportCollector:
         self._model_alias: str | None = None
         self._title: str | None = None
         self._test_file: Path | None = None
+        self._test_func: str | None = None
         self._html_generator = None
 
     def configure(self, *, project_dir: Path, model: str, model_alias: str,
@@ -398,6 +399,9 @@ class _ReportCollector:
 
         # HTML report — custom generator (e.g. dev-record audit) or default
         stable_html = reports_dir / f"{stem}.html"
+        # Sandbox prefix: on Pages, sandbox files live at sandbox/{test_func}0/
+        sandbox_prefix = f"sandbox/{self._test_func}0/" if self._test_func else ""
+
         if self._html_generator:
             report_path = self._project_dir / "test-report.html"
             self._html_generator(
@@ -405,6 +409,7 @@ class _ReportCollector:
                 model=self._model, title=self._title,
                 session_metrics=self.session_metrics,
                 custom=self._custom,
+                sandbox_prefix=sandbox_prefix,
             )
             shutil.copy2(report_path, stable_html)
         else:
@@ -579,6 +584,7 @@ class _ReportCollector:
 @pytest.fixture
 def report(request):
     collector = _ReportCollector()
+    collector._test_func = request.node.name
     request.node._report_collector = collector
     yield collector
     path = collector.finalize()

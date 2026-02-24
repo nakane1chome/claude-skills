@@ -80,6 +80,21 @@ jobs:
           path: tests/reports/*${{ matrix.model }}*
           if-no-files-found: ignore
 
+      - name: Sanitize sandbox filenames
+        if: always()
+        run: |
+          # upload-artifact rejects colons in paths (Windows compat)
+          find /tmp/pytest-sandbox/ -name '*:*' -exec bash -c 'mv "$1" "${1//:/-}"' _ {} \; 2>/dev/null || true
+
+      - name: Upload sandbox
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-${{ matrix.model }}
+          path: /tmp/pytest-sandbox/
+          if-no-files-found: ignore
+          include-hidden-files: true
+
       - name: Job summary
         if: always()
         run: |
@@ -130,6 +145,12 @@ jobs:
           pattern: report-*
           path: artifacts/reports
 
+      - name: Download sandbox artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sandbox-*
+          path: artifacts/sandboxes
+
       - name: Assemble run directory
         run: |
           run_dir="site/runs/${{ github.run_id }}"
@@ -152,8 +173,23 @@ jobs:
             cp "$report_dir"/* "$run_dir/$model/" 2>/dev/null || true
           done
 
+          # Process each sandbox artifact (named sandbox-{model})
+          # Sandbox contains pytest tmp dirs; find project dirs and copy them
+          for sandbox_dir in artifacts/sandboxes/sandbox-*/; do
+            [ -d "$sandbox_dir" ] || continue
+            model=$(basename "$sandbox_dir" | sed 's/^sandbox-//')
+            # Each test creates a project/ dir inside its basetemp subdir
+            for project_dir in "$sandbox_dir"/*/project/; do
+              [ -d "$project_dir" ] || continue
+              # Use the test dir name (e.g. test_full_workflow0) as namespace
+              test_name=$(basename "$(dirname "$project_dir")")
+              mkdir -p "$run_dir/$model/sandbox/$test_name"
+              cp -r "$project_dir"/* "$run_dir/$model/sandbox/$test_name/" 2>/dev/null || true
+            done
+          done
+
           echo "Assembled run directory:"
-          ls -la "$run_dir"/*/
+          find "$run_dir" -maxdepth 3 -type d | head -30
 
       - name: Generate index
         run: python .github/scripts/generate-pages-index.py site/

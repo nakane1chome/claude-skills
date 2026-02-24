@@ -173,6 +173,7 @@ class _AuditHelpers:
         model: str | None = None,
         session_metrics: dict[str, dict] | None = None,
         custom: dict[str, dict] | None = None,
+        sandbox_prefix: str = "",
     ) -> Path:
         """Generate a self-contained HTML session report from audit data.
 
@@ -356,7 +357,8 @@ class _AuditHelpers:
   .file-tree .dir::before {{ content: "\u25BE "; color: #6b7280; }}
   .file-tree .dir.collapsed::before {{ content: "\u25B8 "; }}
   .file-tree .dir.collapsed + ul {{ display: none; }}
-  .file-tree .file {{ color: #374151; padding-left: 2px; }}
+  .file-tree a.file {{ color: #2563eb; text-decoration: none; padding-left: 2px; }}
+  .file-tree a.file:hover {{ text-decoration: underline; }}
   .stat-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
                  gap: 12px; margin: 12px 0; }}
   .stat-card {{ background: #f3f4f6; border-radius: 8px; padding: 12px 16px; }}
@@ -514,7 +516,11 @@ class _AuditHelpers:
                     child = node[name]
                     if isinstance(child, str):
                         display = name.replace(":", "-")
-                        items.append(f'<li><span class="file mono">{h(display)}</span></li>')
+                        href = sandbox_prefix + child.replace(":", "-")
+                        items.append(
+                            f'<li><a class="file mono" href="{h(href)}">'
+                            f'{h(display)}</a></li>'
+                        )
                     else:
                         items.append(
                             f'<li><span class="dir mono">{h(name)}/</span>'
