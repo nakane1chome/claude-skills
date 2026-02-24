@@ -50,10 +50,10 @@ def _run_ablation(input_text: str, output_text: str):
 
 
 async def test_review_preserves_vocabulary(
-    review_project, claude_query, sdk, model, model_alias, report,
+    review_project, sdk, model, model_alias, report,
 ):
     """Claude's review output should preserve domain-specific vocabulary."""
-    project_dir, doc_path = review_project
+    project_dir, doc_path, query_fn = review_project
     input_text = doc_path.read_text(encoding="utf-8")
 
     report.configure(
@@ -61,7 +61,7 @@ async def test_review_preserves_vocabulary(
         title="Review-Steps Ablation Test", test_file=Path(__file__),
     )
 
-    messages = await claude_query(
+    messages = await query_fn(
         REVIEW_PROMPT,
         max_turns=15,
     )
