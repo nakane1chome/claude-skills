@@ -99,13 +99,13 @@ def generate_index(site_dir: Path) -> None:
     run_dirs = [d for d in run_dirs if d.is_dir()]
 
     # Collect all model names across runs for table columns
-    all_models: list[str] = []
+    _MODEL_ORDER = {"weakest": 0, "mid": 1, "strongest": 2}
     seen_models: set[str] = set()
     for rd in run_dirs:
         for md in sorted(rd.iterdir()):
-            if md.is_dir() and md.name not in seen_models:
-                all_models.append(md.name)
+            if md.is_dir():
                 seen_models.add(md.name)
+    all_models = sorted(seen_models, key=lambda m: _MODEL_ORDER.get(m, 99))
 
     # Build run data
     runs = []
@@ -218,7 +218,7 @@ def generate_index(site_dir: Path) -> None:
                     )
                 if mdata["pytest_report"]:
                     links.append(f'<a href="{base}/{mdata["pytest_report"]}">pytest</a>')
-                parts.append(f'<td class="links">{" ".join(links) if links else "-"}</td>')
+                parts.append(f'<td class="links">{"<br>".join(links) if links else "-"}</td>')
             parts.append("</tr>")
         parts.append("</table>")
 
