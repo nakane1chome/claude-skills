@@ -346,7 +346,7 @@ class _ReportCollector:
         self._model_alias: str | None = None
         self._title: str | None = None
         self._test_file: Path | None = None
-        self._test_func: str | None = None
+        self._sandbox_dir: str | None = None
         self._html_generator = None
 
     def configure(self, *, project_dir: Path, model: str, model_alias: str,
@@ -356,6 +356,9 @@ class _ReportCollector:
         self._model_alias = model_alias
         self._title = title
         self._test_file = test_file
+        # Derive sandbox dir from the actual pytest tmp_path name (which may
+        # be truncated for long test names, e.g. "test_review_preserves_vocabula0")
+        self._sandbox_dir = project_dir.parent.name
 
     def set_html_generator(self, fn) -> None:
         """Set an optional HTML report generator.
@@ -399,8 +402,8 @@ class _ReportCollector:
 
         # HTML report — custom generator (e.g. dev-record audit) or default
         stable_html = reports_dir / f"{stem}.html"
-        # Sandbox prefix: on Pages, sandbox files live at sandbox/{test_func}0/
-        sandbox_prefix = f"sandbox/{self._test_func}0/" if self._test_func else ""
+        # Sandbox prefix: on Pages, sandbox files live at sandbox/{tmp_dir_name}/
+        sandbox_prefix = f"sandbox/{self._sandbox_dir}/" if self._sandbox_dir else ""
 
         if self._html_generator:
             report_path = self._project_dir / "test-report.html"
@@ -584,7 +587,6 @@ class _ReportCollector:
 @pytest.fixture
 def report(request):
     collector = _ReportCollector()
-    collector._test_func = request.node.name
     request.node._report_collector = collector
     yield collector
     path = collector.finalize()
