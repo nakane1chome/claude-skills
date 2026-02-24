@@ -508,12 +508,8 @@ class _AuditHelpers:
                     connector = "\u2514\u2500 " if is_last else "\u251c\u2500 "
                     child = node[name]
                     if isinstance(child, str):
-                        href = child.replace(":", "-")
                         display = name.replace(":", "-")
-                        lines.append(
-                            f'{h(prefix)}{connector}'
-                            f'<a href="{h(href)}">{h(display)}</a>'
-                        )
+                        lines.append(f'{h(prefix)}{connector}{h(display)}')
                     else:
                         lines.append(f'{h(prefix)}{connector}{h(name)}/')
                         extension = "\u2502  " if not is_last else "   "
