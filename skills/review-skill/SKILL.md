@@ -1,7 +1,7 @@
 ---
 name: review-skill
 description: >
-  Review a SKILL.md file or skill directory for quality, correctness, and
+  Reviews a SKILL.md file or skill directory for quality, correctness, and
   alignment with Claude Code skill conventions. Use when you've written a new
   skill and want to check it before committing, or when evaluating an existing
   skill for improvements.
@@ -14,9 +14,13 @@ This skill reviews and fixes other skills — identifying issues and applying co
 **Stop after each stage and have changes reviewed with the user.**
 
 > **Note**: The agent checks skills against conventions and best practices, then proposes fixes. The developer approves before changes are applied. When uncertain about intent, ask — don't assume.
+>
+> See `responsibilities.md` for the full agent vs developer ownership matrix.
+
+Each stage produces a checklist of findings (pass / issue / suggestion) and proposes fixes for any issues found. Stage 5 delivers an overall quality assessment and publish/revise/rethink recommendation.
 
 0. **Read and understand the skill** (agent proposes, developer confirms)
-   - Read the target `SKILL.md` at `$ARGUMENTS` (and any supporting files in the directory)
+   - Read the target `SKILL.md` at `$ARGUMENTS` (and any supporting files in the directory). If no argument was provided, ask the user which skill to review.
    - Summarize: what does this skill do, when is it invoked, and what workflow does it follow?
    - Confirm understanding before proceeding to review
 
