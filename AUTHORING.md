@@ -44,6 +44,7 @@ description: >
 
 ### Description tips
 
+- **Write in third person.** Descriptions are injected into the system prompt alongside other skill metadata — third person reads naturally there. Good: `"Extracts text from PDFs..."`. Avoid: `"Extract text from PDFs..."`.
 - Be specific about **when** to use the skill, not just what it does
 - Include trigger phrases users would naturally say
 - Too broad = triggers too often. Too narrow = never triggers.
@@ -59,7 +60,7 @@ description: >
 | `allowed-tools` | all tools | Comma-separated list of tools the skill can use (e.g., `Read, Grep, Glob`) |
 | `context` | main conversation | Set `fork` to run in an isolated subagent (loses conversation history) |
 | `agent` | none | Subagent type when `context: fork` (e.g., `Explore`) |
-| `argument-hint` | none | Shown during autocomplete (e.g., `[filename]`, `[url]`) |
+| `argument-hint` | none | Shown during autocomplete (e.g., `[filename]`, `[url]`). Include this whenever the skill uses `$ARGUMENTS`. |
 
 ### Invocation control patterns
 
@@ -133,6 +134,16 @@ Files in scope: !`ls src/`
 
 The shell command runs first; its output replaces the exclamation-mark backtick expression in the prompt text.
 
+## Output Specification
+
+Skills should declare what they produce:
+
+- **What artifacts?** Files, reports, code, modified documents, terminal output?
+- **What format?** Markdown, structured file hierarchy, HTML, checklist? Provide a template if the format matters.
+- **Where?** Output location or naming convention if the skill creates files.
+
+This can be as simple as a sentence ("Produces a checklist of findings at each stage") or as detailed as a file tree with naming conventions. The point is that the developer and agent agree on what "done" looks like.
+
 ## Supporting Files
 
 - **`responsibilities.md`** — Agent vs developer ownership matrix for multi-stage workflows with mixed ownership
@@ -140,6 +151,29 @@ The shell command runs first; its output replaces the exclamation-mark backtick 
 - **Reference material** — Large lookup tables, checklists, or standards that would bloat `SKILL.md`
 
 Always reference supporting files from `SKILL.md`. Unreferenced files in the skill directory are invisible to Claude.
+
+### Reference depth
+
+Keep file references **at most one level deep** from `SKILL.md`. If `SKILL.md` references `reference.md`, that file should not chain to yet another file. Deeply nested references (`SKILL.md` -> `file-a.md` -> `file-b.md`) risk Claude partially reading or missing content.
+
+### Table of contents for large files
+
+Reference files over **100 lines** should include a table of contents near the top. This lets Claude see the full scope of the file and navigate to relevant sections without reading every line.
+
+## Arguments and Error Handling
+
+If a skill uses `$ARGUMENTS`:
+
+- **Include `argument-hint`** in frontmatter so users see what to pass during autocomplete
+- **Handle missing arguments gracefully** — prompt the user, show usage, or fall back to a sensible default. Don't silently fail or produce empty output.
+
+Skills should also consider what happens when things go wrong:
+
+- **Validation before action** — check preconditions (file exists, dependencies available) before starting work
+- **Clear reporting** — when a stage fails or produces unexpected results, report the problem rather than silently continuing
+- **Recovery or handoff** — for multi-stage skills, describe what happens if a stage can't complete (retry, skip, ask user)
+
+Not every skill needs elaborate error handling, but the skill should not leave the developer guessing when something goes wrong.
 
 ## Anti-patterns
 
@@ -152,6 +186,7 @@ Always reference supporting files from `SKILL.md`. Unreferenced files in the ski
 | All stages batched | Large changes without checkpoints | Break into stages with review pauses |
 | Ambient task instructions | Skill with no `context: fork` and no clear action becomes confusing background noise | Give the skill a clear invocation trigger or use `context: fork` |
 | Inlining everything | `SKILL.md` becomes too long to maintain | Extract reference material to supporting files |
+| Deeply nested file references | Claude may partially read or miss content in chains | Keep references one level deep from `SKILL.md` |
 
 ## Composition
 

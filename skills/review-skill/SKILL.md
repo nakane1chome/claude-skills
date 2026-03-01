@@ -30,6 +30,8 @@ This skill reviews and fixes other skills — identifying issues and applying co
      - Side-effect workflows should use `disable-model-invocation: true`
      - Background knowledge should use `user-invocable: false`
    - Is `allowed-tools` set if the skill should restrict tool access?
+   - Is `argument-hint` present if the skill uses `$ARGUMENTS`?
+   - Is the `description` written in third person? (descriptions are injected into the system prompt — third person reads naturally there)
    - Are `context`/`agent` set appropriately if the skill runs in isolation?
    - Are there unknown or misspelled frontmatter fields?
 
@@ -44,6 +46,8 @@ This skill reviews and fixes other skills — identifying issues and applying co
    - Are agent vs developer responsibilities clear at each stage?
    - Does it use questions to guide analysis, not just imperatives?
    - Is the skill under 500 lines? Does it reference supporting files for detail rather than inlining everything?
+   - Does the skill specify what artifacts or outputs it produces and in what format? (reports, checklists, files, modified documents)
+   - Are file references at most one level deep from SKILL.md? (no file→file→file chains — Claude may partially read nested references)
    - Is the stage numbering consistent and logical?
 
    Report findings as a checklist: pass / issue / suggestion. Then apply fixes for any issues, with developer approval.
@@ -56,12 +60,16 @@ This skill reviews and fixes other skills — identifying issues and applying co
    - Is the scope right-sized? (Not trying to do too much in one skill)
    - Are `$ARGUMENTS`, `$0`, `$1` used correctly if present?
    - Is dynamic context (exclamation-mark backtick syntax) used correctly if present?
+   - If the skill uses `$ARGUMENTS`, does it handle missing or invalid arguments gracefully? (prompt the user, show usage, or fail with a clear message)
+   - Does the skill address what happens when it encounters an error or unexpected state? (validation, recovery, or clear reporting — not every skill needs elaborate handling, but it shouldn't leave the developer guessing)
+   - Do reference files over 100 lines include a table of contents so Claude can see their full scope?
    - Are supporting files referenced from `SKILL.md`?
    - Check for anti-patterns:
      - Overly broad or narrow description
      - No review pauses in a multi-stage workflow
      - Unreferenced supporting files in the directory
      - Task instructions in a skill with no `context: fork` and no clear action
+     - Deeply nested file references (file→file→file chains that Claude may not follow)
      - **Agent escape hatches**: Soft language ("where appropriate", "if you have a clear fix", "as needed") that lets the agent skip required work. Completion gates must use hard prerequisites, not discretionary phrasing. Look for: conditional qualifiers on mandatory steps, missing definitions of done, and loops without explicit exit criteria.
 
    Report findings as a checklist: pass / issue / suggestion. Then apply fixes for any issues, with developer approval.
@@ -90,6 +98,7 @@ This skill reviews and fixes other skills — identifying issues and applying co
    - Top 3 issues to address (if any)
    - Top 3 strengths (what the skill does well)
    - Recommendation: publish / revise / rethink
+   - If the skill will be used across model tiers (Haiku, Sonnet, Opus), flag whether instructions are explicit enough for smaller models — what works for Opus may need more detail for Haiku
 
 
 ## When to Use This vs Other Skills
