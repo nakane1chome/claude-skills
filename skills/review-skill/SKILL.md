@@ -62,6 +62,7 @@ This skill reviews and fixes other skills — identifying issues and applying co
      - No review pauses in a multi-stage workflow
      - Unreferenced supporting files in the directory
      - Task instructions in a skill with no `context: fork` and no clear action
+     - **Agent escape hatches**: Soft language ("where appropriate", "if you have a clear fix", "as needed") that lets the agent skip required work. Completion gates must use hard prerequisites, not discretionary phrasing. Look for: conditional qualifiers on mandatory steps, missing definitions of done, and loops without explicit exit criteria.
 
    Report findings as a checklist: pass / issue / suggestion. Then apply fixes for any issues, with developer approval.
 
