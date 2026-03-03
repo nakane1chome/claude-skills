@@ -13,7 +13,7 @@ Passive recording of agent activity during Claude Code sessions. Captures what w
 
 > **Note**: This is a record-only skill — it stores raw data but does not compute trends or analysis. Consumers (other skills, scripts, or humans) interpret the records.
 
-> **Plugin model**: Hooks are registered declaratively via `plugin.json` + `hooks/hooks.json`. When loaded as a plugin (`--plugin-dir`), Claude Code auto-registers all hooks — no manual installation into `.claude/settings.json` required.
+> **Auto-loaded hooks**: Running `setup` registers hooks directly in the project's `.claude/settings.json`. No `--plugin-dir` flag required — hooks fire automatically for every session in the project.
 
 ## Actions
 
@@ -27,8 +27,8 @@ The script:
 1. Adds `audit/ops_record/` to `.gitignore`
 2. Appends agent self-reporting guidance to `CLAUDE.md`
 3. Creates `audit/ops_record/` and `audit/dev_record/` directories
-
-Hooks are loaded automatically when the plugin is active — this action only sets up project-level files.
+4. Installs `audit/agent-report.sh` helper for agent self-reporting
+5. Registers hooks in `.claude/settings.json` — hooks fire automatically from this point on, no `--plugin-dir` needed
 
 ### `status`
 
@@ -155,6 +155,8 @@ Scripts live in `hooks/` within this plugin directory. When loaded via `--plugin
 | `finalize-session.sh` | `SessionEnd` | Extract project artifacts from ops_record to dev_record |
 
 All scripts require `jq`. Each script exits 0 (non-blocking) and appends to JSONL, so concurrent sessions write to separate files without conflict.
+
+Hook paths are resolved at install time and written as absolute paths in `.claude/settings.json`. If you move the plugin directory, re-run `setup` to update the paths.
 
 ## When to Use This vs Other Tools
 

@@ -1,7 +1,5 @@
 #!/bin/bash
-# Initialize a project for dev-record: .gitignore, CLAUDE.md, audit dirs.
-# Hooks are registered via the plugin model (plugin.json + hooks/hooks.json),
-# so this script only handles project-level setup.
+# Initialize a project for dev-record: .gitignore, CLAUDE.md, audit dirs, settings.json hooks.
 # Run from the project root, or set CLAUDE_PROJECT_DIR.
 
 set -euo pipefail
@@ -58,5 +56,36 @@ mkdir -p "$PROJECT_DIR/audit/dev_record"
 cp "$SCRIPT_DIR/hooks/agent-report.sh" "$PROJECT_DIR/audit/agent-report.sh"
 chmod +x "$PROJECT_DIR/audit/agent-report.sh"
 echo "  Installed audit/agent-report.sh"
+
+# Register hooks in .claude/settings.json so they fire automatically
+# without requiring --plugin-dir on every invocation.
+SETTINGS="$PROJECT_DIR/.claude/settings.json"
+mkdir -p "$PROJECT_DIR/.claude"
+
+if [ ! -f "$SETTINGS" ]; then
+  echo '{}' > "$SETTINGS"
+fi
+
+if grep -qF "record-prompt.sh" "$SETTINGS" 2>/dev/null; then
+  echo "  Hooks already registered in .claude/settings.json — skipped"
+else
+  HOOKS_DIR="$SCRIPT_DIR/hooks"
+  jq --arg hd "$HOOKS_DIR" '
+    .hooks |= (. // {}) |
+    .hooks.UserPromptSubmit |= (. // []) + [
+      {"matcher": "", "hooks": [{"type": "command", "command": ("bash \"" + $hd + "/record-prompt.sh\"")}]}
+    ] |
+    .hooks.PreToolUse |= (. // []) + [
+      {"matcher": ".*", "hooks": [{"type": "command", "command": ("bash \"" + $hd + "/record-tool-call.sh\"")}]}
+    ] |
+    .hooks.PostToolUse |= (. // []) + [
+      {"matcher": ".*", "hooks": [{"type": "command", "command": ("bash \"" + $hd + "/record-tool-result.sh\"")}]}
+    ] |
+    .hooks.SessionEnd |= (. // []) + [
+      {"matcher": "", "hooks": [{"type": "command", "command": ("bash \"" + $hd + "/finalize-session.sh\"")}]}
+    ]
+  ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+  echo "  Registered hooks in .claude/settings.json (hooks dir: $HOOKS_DIR)"
+fi
 
 echo "Done. Project initialized for dev-record."
