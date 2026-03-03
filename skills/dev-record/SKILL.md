@@ -127,26 +127,20 @@ The install action appends the following to the project's CLAUDE.md. This instru
 ```markdown
 ## Dev Record — Agent Self-Reporting
 
-You MUST append a JSONL line to the current session's event log when any of
-the following occur. The log file is in `audit/ops_record/` and matches the
-pattern `*-<session-id>.jsonl`. These events are extracted to `audit/dev_record/`
-at session end as permanent project artifacts. Failure to report is itself a deviation.
+You MUST call the self-reporting helper when any of the following occur. These
+events are extracted to `audit/dev_record/` at session end as permanent project
+artifacts. Failure to report is itself a deviation.
 
 - **Plan stated**: You commit to an approach — especially when implementing from a design document or spec. Record the plan before executing it.
 - **Plan deviation**: You make a decision that differs from the committed plan.
 - **Declined as difficult**: You decline work because it would be difficult.
 - **Ignored prior failure**: You discover a prior failure and choose not to resolve it.
 
-Format (one JSON object per line — shown pretty-printed for readability):
-{
-  "timestamp": "ISO8601",
-  "session_id": "SESSION_ID",
-  "type": "agent_report",
-  "content": {
-    "event": "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure",
-    "detail": "brief description"
-  }
-}
+Run this command, substituting the actual values:
+
+​```bash
+bash audit/agent-report.sh "SESSION_ID" "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure" "brief description"
+​```
 ```
 
 ### Hook Scripts
