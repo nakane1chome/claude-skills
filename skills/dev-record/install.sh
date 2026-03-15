@@ -40,11 +40,15 @@ artifacts. Failure to report is itself a deviation.
 - **Plan deviation**: You make a decision that differs from the committed plan.
 - **Declined as difficult**: You decline work because it would be difficult.
 - **Ignored prior failure**: You discover a prior failure and choose not to resolve it.
+- **Scope creep**: You perform work not requested and not part of the committed plan.
+- **Observation misread as instruction**: You acted on something stated as observation as if it were a directive.
 
 Run this command, substituting the actual values:
 
 ```bash
-bash audit/agent-report.sh "SESSION_ID" "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure" "brief description"
+bash audit/agent-report.sh "SESSION_ID" \
+  "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure|scope_creep|observation_misread_as_instruction" \
+  "brief description"
 ```
 SNIPPET
   echo "  Appended Dev Record section to $CLAUDE_MD"

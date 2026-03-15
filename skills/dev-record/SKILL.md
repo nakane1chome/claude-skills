@@ -53,6 +53,7 @@ Report the current state of dev-record in the project.
 | Decision outcomes | `PostToolUse` | Whether each tool call succeeded or was denied |
 | Plan snapshots | `PostToolUse` | Transcript path captured when agent exits plan mode |
 | Session boundaries | `SessionEnd` | Session summary with raw counts |
+| Hook-detected anomalies | `PreToolUse` / `PostToolUse` | `stop_ignored`, `hallucinated_path`, `repeated_failure`, `regression_unlabelled` (see Limitations below) |
 
 **Secondary metrics** (derived from primary records — raw counts, not computed rates):
 
@@ -73,8 +74,12 @@ Report the current state of dev-record in the project.
 | `plan_deviation` | Agent makes a decision that differs from the committed plan |
 | `declined_difficult` | Agent declines work because it would be difficult |
 | `ignored_prior_failure` | Agent discovers a prior failure and chooses not to resolve it |
+| `scope_creep` | Agent performs work not requested and not part of the committed plan |
+| `observation_misread_as_instruction` | Agent acted on something stated as an observation as if it were a directive |
 
 > **Limitation**: Self-reporting is least reliable for the exact situations it's designed to capture. An agent that declines difficult work may rationalize it as "out of scope" rather than flag it. Treat self-reported events as a lower bound, not a complete record. The developer should review sessions and append additional `agent_report` entries for events the agent missed.
+
+> **Hook detection limitations**: Hook-detected anomaly events (`stop_ignored`, `repeated_failure`, `regression_unlabelled`) use `tool_response.success = false` to indicate a failed tool call. In practice, `success = false` means the user *denied* the tool call, not that the command exited with a non-zero status. These detectors therefore identify repeated permission denials, not execution failures. Stop-word matching (`stop_ignored`) uses a fixed word list and will produce false positives for prompts that use these words in a non-imperative context (e.g. "don't worry, proceed").
 
 ### Retention
 
@@ -135,11 +140,15 @@ artifacts. Failure to report is itself a deviation.
 - **Plan deviation**: You make a decision that differs from the committed plan.
 - **Declined as difficult**: You decline work because it would be difficult.
 - **Ignored prior failure**: You discover a prior failure and choose not to resolve it.
+- **Scope creep**: You perform work not requested and not part of the committed plan.
+- **Observation misread as instruction**: You acted on something stated as observation as if it were a directive.
 
 Run this command, substituting the actual values:
 
 ​```bash
-bash audit/agent-report.sh "SESSION_ID" "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure" "brief description"
+bash audit/agent-report.sh "SESSION_ID" \
+  "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure|scope_creep|observation_misread_as_instruction" \
+  "brief description"
 ​```
 ```
 
