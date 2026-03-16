@@ -32,24 +32,32 @@ else
 
 ## Dev Record — Agent Self-Reporting
 
-You MUST call the self-reporting helper when any of the following occur. These
-events are extracted to `audit/dev_record/` at session end as permanent project
-artifacts. Failure to report is itself a deviation.
+You MUST log self-report events using the helper script. These events are
+extracted to `audit/dev_record/` at session end as permanent project artifacts.
+Failure to report is itself a deviation.
 
-- **Plan stated**: You commit to an approach — especially when implementing from a design document or spec. Record the plan before executing it.
-- **Plan deviation**: You make a decision that differs from the committed plan.
+**When to report — log BEFORE proceeding, not after:**
+
+- **Plan stated**: You commit to an approach. Log BEFORE you start implementing.
+- **Plan deviation**: You decide to skip, change, or add a step. Log BEFORE making the change.
 - **Declined as difficult**: You decline work because it would be difficult.
 - **Ignored prior failure**: You discover a prior failure and choose not to resolve it.
 - **Scope creep**: You perform work not requested and not part of the committed plan.
 - **Observation misread as instruction**: You acted on something stated as observation as if it were a directive.
 
-Run this command, substituting the actual values:
+**How to report:**
 
 ```bash
-bash audit/agent-report.sh "SESSION_ID" \
-  "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure|scope_creep|observation_misread_as_instruction" \
-  "brief description"
+bash audit/agent-report.sh "SESSION_ID" "EVENT_TYPE" "brief description"
 ```
+
+Where EVENT_TYPE is one of: `plan_stated`, `plan_deviation`, `declined_difficult`, `ignored_prior_failure`, `scope_creep`, `observation_misread_as_instruction`
+
+**Decision-point triggers** — if you are about to do any of these, FIRST log a `plan_deviation`:
+- Skip a file listed in the plan
+- Create a file not listed in the plan
+- Use a different approach than what the plan describes
+- Change the interface or API from what was planned
 SNIPPET
   echo "  Appended Dev Record section to $CLAUDE_MD"
 fi
