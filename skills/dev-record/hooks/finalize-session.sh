@@ -53,7 +53,11 @@ STARTED=$(jq -s '.[0].timestamp // empty' "$LOG_FILE")
 # against actual git changes. Emit unrecorded_deviation events for mismatches.
 
 PLAN_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/plans"
-PLAN_FILE=$(find "$PLAN_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -print -quit 2>/dev/null || true)
+# Find the latest sequenced plan file; fall back to old naming convention
+PLAN_FILE=$(find "$PLAN_DIR" -maxdepth 1 -name "*-${SESSION_ID}-plan-*.md" 2>/dev/null | sort | tail -1)
+if [ -z "$PLAN_FILE" ]; then
+  PLAN_FILE=$(find "$PLAN_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -print -quit 2>/dev/null || true)
+fi
 
 if [ -n "$PLAN_FILE" ] && [ -f "$PLAN_FILE" ]; then
   # Extract planned files from markdown table: | `path` | Action |
