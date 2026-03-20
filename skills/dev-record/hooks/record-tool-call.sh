@@ -24,22 +24,33 @@ jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg tool "$TOOL_NAME" --a
   '{timestamp: $ts, session_id: $sid, type: "tool_call", content: {tool: $tool, input: $input}}' \
   >> "$LOG_FILE"
 
+# Stop-ignored detection: if a stop-word flag exists from the prior prompt,
+# the agent proceeded with a tool call despite the user saying stop.
+# Consume the flag once so it doesn't cascade across multiple tool calls.
+FLAG_FILE="$LOG_DIR/.stop_flag_${SESSION_ID}"
+if [ -f "$FLAG_FILE" ]; then
+  rm -f "$FLAG_FILE"
+  jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg tool "$TOOL_NAME" \
+    '{timestamp:$ts,session_id:$sid,type:"agent_report",
+      content:{event:"stop_ignored",detail:("agent proceeded with tool "+$tool+" despite stop-word in prior prompt")}}' \
+    >> "$LOG_FILE"
+fi
+
 # If this is ExitPlanMode, save the plan content as a snapshot file and log the event.
 # We capture here (PreToolUse) because PostToolUse may not fire if the session ends.
 # Skip if a plan for this session already exists (model sometimes calls ExitPlanMode twice).
 if [ "$TOOL_NAME" = "ExitPlanMode" ]; then
-  PLAN_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/plans"
-  EXISTING=$(find "$PLAN_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -print -quit 2>/dev/null || true)
-  if [ -z "$EXISTING" ]; then
-    PLAN_CONTENT=$(echo "$TOOL_INPUT" | jq -r '.plan // empty')
-    if [ -n "$PLAN_CONTENT" ]; then
-      mkdir -p "$PLAN_DIR"
-      PLAN_FILE="$PLAN_DIR/${TIMESTAMP}-${SESSION_ID}.md"
-      echo "$PLAN_CONTENT" > "$PLAN_FILE"
-      jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg pf "$PLAN_FILE" \
-        '{timestamp: $ts, session_id: $sid, type: "plan_snapshot", content: {plan_file: $pf}}' \
-        >> "$LOG_FILE"
-    fi
+  PLAN_CONTENT=$(echo "$TOOL_INPUT" | jq -r '.plan // empty')
+  if [ -n "$PLAN_CONTENT" ]; then
+    PLAN_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/plans"
+    mkdir -p "$PLAN_DIR"
+    EXISTING_COUNT=$(find "$PLAN_DIR" -maxdepth 1 -name "*-${SESSION_ID}-plan-*.md" 2>/dev/null | wc -l)
+    SEQ=$(printf '%02d' $((EXISTING_COUNT + 1)))
+    PLAN_FILE="$PLAN_DIR/${TIMESTAMP}-${SESSION_ID}-plan-${SEQ}.md"
+    echo "$PLAN_CONTENT" > "$PLAN_FILE"
+    jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg pf "$PLAN_FILE" --argjson seq "$((EXISTING_COUNT + 1))" \
+      '{timestamp: $ts, session_id: $sid, type: "plan_snapshot", content: {plan_file: $pf, sequence: $seq}}' \
+      >> "$LOG_FILE"
   fi
 fi
 

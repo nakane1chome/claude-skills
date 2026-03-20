@@ -44,17 +44,15 @@ async def installed_project(sandbox_project, claude_query):
     assert (project / "audit" / "dev_record").is_dir(), "audit/dev_record/ missing"
     assert (project / "audit" / "ops_record").is_dir(), "audit/ops_record/ missing"
 
-    # Verify plugin structure exists
-    plugin_dir = project / ".claude" / "skills" / "dev-record"
-    assert (plugin_dir / "plugin.json").is_file(), "plugin.json missing"
-    assert (plugin_dir / "hooks" / "hooks.json").is_file(), "hooks/hooks.json missing"
+    # Verify hooks were registered in .claude/settings.json by install.sh
+    settings = project / ".claude" / "settings.json"
+    assert settings.is_file(), ".claude/settings.json missing — install.sh should have created it"
+    settings_text = settings.read_text()
+    assert "record-prompt.sh" in settings_text, (
+        "Hooks not registered in .claude/settings.json — install.sh should have added them"
+    )
 
-    # Wrap claude_query to inject plugin
-    async def _query_with_plugin(prompt, **overrides):
-        overrides.setdefault("plugins", [{"type": "local", "path": str(plugin_dir)}])
-        return await claude_query(prompt, **overrides)
-
-    yield project, _query_with_plugin
+    yield project, claude_query
 
 
 # ---------------------------------------------------------------------------

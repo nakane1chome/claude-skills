@@ -23,4 +23,16 @@ jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg p "$PROMPT" \
   '{timestamp: $ts, session_id: $sid, type: "user_prompt", content: {prompt: $p}}' \
   >> "$LOG_FILE"
 
+# Stop-word detection: set flag if prompt contains a stop-word so the next
+# tool call hook can detect if the agent proceeded despite the user saying stop.
+STOP_WORDS=("wait" "stop" "pause" "hold on" "don't" "dont" "no," "no." "cancel")
+PROMPT_LOWER=$(echo "$PROMPT" | tr '[:upper:]' '[:lower:]')
+FLAG_FILE="$LOG_DIR/.stop_flag_${SESSION_ID}"
+rm -f "$FLAG_FILE"                          # always clear prior flag
+for word in "${STOP_WORDS[@]}"; do
+  if echo "$PROMPT_LOWER" | grep -qF "$word"; then
+    touch "$FLAG_FILE"; break
+  fi
+done
+
 exit 0
