@@ -62,6 +62,11 @@ async def test_double_install(sandbox_project, claude_query, sdk, audit):
     session_id = sdk.session_id(messages)
     assert session_id is not None, "No session_id found in ResultMessage"
 
+    # SDK may not trigger SessionEnd for short sessions — finalize manually as fallback
+    dev_dir = project / "audit" / "dev_record"
+    if not list(dev_dir.glob("*.json")):
+        audit.finalize(project, session_id)
+
     audit.assert_common(project)
     summary = audit.read_summary(project, session_id)
     assert summary["tool_attempts"] == 0

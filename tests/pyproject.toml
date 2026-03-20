@@ -5,13 +5,16 @@ description = "End-to-end tests for claude-skills"
 requires-python = ">=3.10"
 dependencies = [
     "claude-agent-sdk",
-    "pytest",
+    "pytest>=8,<9",
     "pytest-asyncio",
     "pytest-html",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.setuptools]
+packages = []
 
 [build-system]
 requires = ["setuptools"]
