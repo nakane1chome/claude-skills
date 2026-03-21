@@ -9,12 +9,20 @@ install: ## Install skills interactively
 	./install.sh
 
 test: ## Run tests and generate HTML report
-	@mkdir -p $(SITE_DIR)/runs/local/local
 	cd tests && pip install -e . && pytest -v \
 		--rootdir . -c pyproject.toml \
-		--html $(CURDIR)/$(SITE_DIR)/runs/local/local/pytest-local.html \
+		--html reports/pytest-local.html \
 		--self-contained-html; \
 	rc=$$?; \
+	for f in reports/skills-*.json; do \
+		[ -f "$$f" ] || continue; \
+		model=$$(basename "$$f" | rev | cut -d- -f1 | rev | cut -d. -f1); \
+		mkdir -p $(CURDIR)/$(SITE_DIR)/runs/local/$$model; \
+		cp reports/*-$$model.html reports/*-$$model.json \
+			$(CURDIR)/$(SITE_DIR)/runs/local/$$model/ 2>/dev/null || true; \
+		cp reports/pytest-local.html \
+			$(CURDIR)/$(SITE_DIR)/runs/local/$$model/pytest-$$model.html 2>/dev/null || true; \
+	done; \
 	python $(CURDIR)/.github/scripts/generate-pages-index.py $(CURDIR)/$(SITE_DIR); \
 	exit $$rc
 

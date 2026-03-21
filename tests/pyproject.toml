@@ -23,9 +23,6 @@ asyncio_mode = "auto"
 [project.scripts]
 ablation = "tools.ablation.cli:main"
 
-[tool.setuptools]
-packages = []
-
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
