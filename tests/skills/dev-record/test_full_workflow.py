@@ -20,20 +20,20 @@ Create a plan, then exit plan mode.
 IMPLEMENT_PROMPT = """\
 Implement the multilingual hello-world state machine based on this specification:
 
-- Create a file `state_machine.py` with a StateMachine class
+- Create `state_machine.py` in the current working directory with a StateMachine class
 - States: English ("hello world"), Spanish ("hola mundo")
 - The machine cycles through languages in order
-- Create `test_state_machine.py` with pytest tests verifying each language output
+- Create `test_state_machine.py` in the current working directory with pytest tests verifying each language output
 - Run pytest to verify the tests pass
 
-Create the files and run the tests.
+Create both files in the current directory (not /tmp or any other location) and run the tests.
 """
 
 EXTEND_PROMPT = """\
 Add Japanese as a third language to the state machine:
 
-1. Add a Japanese state that outputs "こんにちは世界" to `state_machine.py`
-2. Add a test for the Japanese output in `test_state_machine.py`
+1. Add a Japanese state that outputs "こんにちは世界" to `state_machine.py` in the current directory
+2. Add a test for the Japanese output in `test_state_machine.py` in the current directory
 3. Run all tests with pytest and summarize the results
 
 Important: Do not fix any pre-existing test failures. Only add the new language and its test.

@@ -9,7 +9,7 @@ dependencies = [
     "click>=8.0",
     "marko>=2.0",
     "numpy>=1.24",
-    "pytest",
+    "pytest>=8,<9",
     "pytest-asyncio",
     "pytest-html",
     "pyyaml>=6.0",
@@ -22,6 +22,9 @@ asyncio_mode = "auto"
 
 [project.scripts]
 ablation = "tools.ablation.cli:main"
+
+[tool.setuptools]
+packages = []
 
 [build-system]
 requires = ["setuptools"]

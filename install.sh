@@ -81,6 +81,13 @@ for skill in "${selected[@]}"; do
   mkdir -p "$target"
   cp -r "$SKILLS_SRC/$skill"/. "$target"
   echo "  Installed $skill -> $target"
+
+  # If the skill has a project install.sh and we're doing a project install, run it.
+  # Global installs only copy files — run the skill's install.sh in each project separately.
+  if [[ "$dest_choice" == "2" && -f "$target/install.sh" ]]; then
+    echo "  Running $skill project setup..."
+    CLAUDE_PROJECT_DIR="$(pwd)" bash "$target/install.sh"
+  fi
 done
 
 echo ""

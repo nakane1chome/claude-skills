@@ -13,7 +13,7 @@ Passive recording of agent activity during Claude Code sessions. Captures what w
 
 > **Note**: This is a record-only skill — it stores raw data but does not compute trends or analysis. Consumers (other skills, scripts, or humans) interpret the records.
 
-> **Plugin model**: Hooks are registered declaratively via `plugin.json` + `hooks/hooks.json`. When loaded as a plugin (`--plugin-dir`), Claude Code auto-registers all hooks — no manual installation into `.claude/settings.json` required.
+> **Auto-loaded hooks**: Running `setup` registers hooks directly in the project's `.claude/settings.json`. No `--plugin-dir` flag required — hooks fire automatically for every session in the project.
 
 ## Actions
 
@@ -27,8 +27,8 @@ The script:
 1. Adds `audit/ops_record/` to `.gitignore`
 2. Appends agent self-reporting guidance to `CLAUDE.md`
 3. Creates `audit/ops_record/` and `audit/dev_record/` directories
-
-Hooks are loaded automatically when the plugin is active — this action only sets up project-level files.
+4. Installs `audit/agent-report.sh` helper for agent self-reporting
+5. Registers hooks in `.claude/settings.json` — hooks fire automatically from this point on, no `--plugin-dir` needed
 
 ### `status`
 
@@ -53,6 +53,8 @@ Report the current state of dev-record in the project.
 | Decision outcomes | `PostToolUse` | Whether each tool call succeeded or was denied |
 | Plan snapshots | `PostToolUse` | Transcript path captured when agent exits plan mode |
 | Session boundaries | `SessionEnd` | Session summary with raw counts |
+| Hook-detected anomalies | `PreToolUse` / `PostToolUse` | `stop_ignored`, `hallucinated_path`, `repeated_failure`, `regression_unlabelled` (see Limitations below) |
+| Plan-vs-actual file diff | `SessionEnd` | `unrecorded_deviation` — files in plan but not touched, or files touched but not in plan (see [Plan File Diff Detection](#plan-file-diff-detection)) |
 
 **Secondary metrics** (derived from primary records — raw counts, not computed rates):
 
@@ -73,8 +75,32 @@ Report the current state of dev-record in the project.
 | `plan_deviation` | Agent makes a decision that differs from the committed plan |
 | `declined_difficult` | Agent declines work because it would be difficult |
 | `ignored_prior_failure` | Agent discovers a prior failure and chooses not to resolve it |
+| `scope_creep` | Agent performs work not requested and not part of the committed plan |
+| `observation_misread_as_instruction` | Agent acted on something stated as an observation as if it were a directive |
 
 > **Limitation**: Self-reporting is least reliable for the exact situations it's designed to capture. An agent that declines difficult work may rationalize it as "out of scope" rather than flag it. Treat self-reported events as a lower bound, not a complete record. The developer should review sessions and append additional `agent_report` entries for events the agent missed.
+
+> **Hook detection limitations**: Hook-detected anomaly events (`stop_ignored`, `repeated_failure`, `regression_unlabelled`) use `tool_response.success = false` to indicate a failed tool call. In practice, `success = false` means the user *denied* the tool call, not that the command exited with a non-zero status. These detectors therefore identify repeated permission denials, not execution failures. Stop-word matching (`stop_ignored`) uses a fixed word list and will produce false positives for prompts that use these words in a non-imperative context (e.g. "don't worry, proceed").
+
+### Plan File Diff Detection
+
+When a plan snapshot exists for the session, the `SessionEnd` hook automatically compares the plan's file list against actual git changes. This catches structural deviations the agent failed to self-report.
+
+**How it works:**
+
+1. The `ExitPlanMode` hook (in `record-tool-call.sh`) saves the plan content to `audit/plans/`
+2. At session end, `finalize-session.sh` parses the plan for a markdown file table (`| File | Action |`)
+3. It runs `git diff --name-only` to get the files actually changed during the session
+4. It compares the two lists and emits `unrecorded_deviation` events for:
+   - **Planned files not touched** — files listed in the plan with action Create/Modify that have no corresponding git change
+   - **Unplanned files touched** — files changed in git that don't appear in the plan's file table
+5. These events appear in the session summary's `agent_reports` array and in the `-events.jsonl` artifact
+
+**Limitations:**
+- Only detects file-level structural deviations, not intent-based ones ("I used a different algorithm")
+- Requires a plan snapshot (sessions without `ExitPlanMode` are not checked)
+- File path matching is substring-based (plan may use relative paths like `src/bus/bus.hpp` while git uses full paths)
+- Files in `audit/`, `.claude/`, and common non-source paths are excluded from the unplanned check
 
 ### Retention
 
@@ -122,31 +148,37 @@ Operational detail is equivalent to ephemeral communication (chat messages, verb
 
 ### CLAUDE.md Snippet
 
-The install action appends the following to the project's CLAUDE.md. This instructs the agent to self-report events that hooks cannot detect.
+The install action appends the following to the project's CLAUDE.md. This instructs the agent to self-report events that hooks cannot detect. The key design principle is **log BEFORE proceeding** — anchoring the reporting requirement to the decision point rather than relying on the agent remembering to report after the fact.
 
 ```markdown
 ## Dev Record — Agent Self-Reporting
 
-You MUST append a JSONL line to the current session's event log when any of
-the following occur. The log file is in `audit/ops_record/` and matches the
-pattern `*-<session-id>.jsonl`. These events are extracted to `audit/dev_record/`
-at session end as permanent project artifacts. Failure to report is itself a deviation.
+You MUST log self-report events using the helper script. These events are
+extracted to `audit/dev_record/` at session end as permanent project artifacts.
+Failure to report is itself a deviation.
 
-- **Plan stated**: You commit to an approach — especially when implementing from a design document or spec. Record the plan before executing it.
-- **Plan deviation**: You make a decision that differs from the committed plan.
+**When to report — log BEFORE proceeding, not after:**
+
+- **Plan stated**: You commit to an approach. Log BEFORE you start implementing.
+- **Plan deviation**: You decide to skip, change, or add a step. Log BEFORE making the change.
 - **Declined as difficult**: You decline work because it would be difficult.
 - **Ignored prior failure**: You discover a prior failure and choose not to resolve it.
+- **Scope creep**: You perform work not requested and not part of the committed plan.
+- **Observation misread as instruction**: You acted on something stated as observation as if it were a directive.
 
-Format (one JSON object per line — shown pretty-printed for readability):
-{
-  "timestamp": "ISO8601",
-  "session_id": "SESSION_ID",
-  "type": "agent_report",
-  "content": {
-    "event": "plan_stated|plan_deviation|declined_difficult|ignored_prior_failure",
-    "detail": "brief description"
-  }
-}
+**How to report:**
+
+​```bash
+bash audit/agent-report.sh "SESSION_ID" "EVENT_TYPE" "brief description"
+​```
+
+Where EVENT_TYPE is one of: `plan_stated`, `plan_deviation`, `declined_difficult`, `ignored_prior_failure`, `scope_creep`, `observation_misread_as_instruction`
+
+**Decision-point triggers** — if you are about to do any of these, FIRST log a `plan_deviation`:
+- Skip a file listed in the plan
+- Create a file not listed in the plan
+- Use a different approach than what the plan describes
+- Change the interface or API from what was planned
 ```
 
 ### Hook Scripts
@@ -158,9 +190,11 @@ Scripts live in `hooks/` within this plugin directory. When loaded via `--plugin
 | `record-prompt.sh` | `UserPromptSubmit` | Log human input |
 | `record-tool-call.sh` | `PreToolUse` | Log agent tool decisions |
 | `record-tool-result.sh` | `PostToolUse` | Log outcomes, detect plan exits |
-| `finalize-session.sh` | `SessionEnd` | Extract project artifacts from ops_record to dev_record |
+| `finalize-session.sh` | `SessionEnd` | Extract project artifacts from ops_record to dev_record; plan-vs-actual file diff detection |
 
 All scripts require `jq`. Each script exits 0 (non-blocking) and appends to JSONL, so concurrent sessions write to separate files without conflict.
+
+Hook paths are resolved at install time and written as absolute paths in `.claude/settings.json`. If you move the plugin directory, re-run `setup` to update the paths.
 
 ## When to Use This vs Other Tools
 
