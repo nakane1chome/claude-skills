@@ -3,11 +3,15 @@
 Sends a structured draft to Claude for review (stages 0-2 of review-steps),
 then runs the ablation detector on the input vs output to verify that
 domain-specific vocabulary was preserved.
+
+Uses multi-turn conversation to respond to the skill's stop-after-each-stage
+pattern with approval messages, mimicking a real developer interaction.
 """
 
 from pathlib import Path
 
 import pytest
+from claude_agent_sdk.types import ResultMessage
 
 from tools.ablation.chunker import chunk_markdown
 from tools.ablation.embedder import TfidfEmbedder
@@ -28,9 +32,11 @@ consistent terminology and patterns
 acronyms on first use
 
 Apply all corrections directly to `draft.md` and save the result.
-Do not wait for approval between stages — proceed through all three and save \
-the final version.
 """
+
+CONTINUE_PROMPT = "Please proceed as suggested."
+
+MAX_FOLLOW_UPS = 5
 
 
 def _run_ablation(input_text: str, output_text: str):
@@ -50,7 +56,7 @@ def _run_ablation(input_text: str, output_text: str):
 
 
 async def test_review_preserves_vocabulary(
-    review_project, sdk, model, model_alias, report,
+    review_project, sdk, model, model_alias, report, audit,
 ):
     """Claude's review output should preserve domain-specific vocabulary."""
     project_dir, doc_path, query_fn = review_project
@@ -61,20 +67,32 @@ async def test_review_preserves_vocabulary(
         title="Review-Steps Ablation Test", test_file=Path(__file__),
     )
 
-    messages = await query_fn(
-        REVIEW_PROMPT,
-        max_turns=15,
-    )
+    # Multi-turn: send initial prompt, then respond with approvals
+    # when the skill pauses for developer review between stages
+    async with query_fn.conversation(max_turns=15) as conv:
+        await conv.say(REVIEW_PROMPT)
 
-    result = sdk.result(messages)
+        for _ in range(MAX_FOLLOW_UPS):
+            if doc_path.read_text(encoding="utf-8") != input_text:
+                break
+            await conv.say(CONTINUE_PROMPT)
+
+    all_messages = conv.messages
+    # With multi-turn, use the last ResultMessage (final session state)
+    results = [m for m in all_messages if isinstance(m, ResultMessage)]
+    result = results[-1] if results else None
     assert result is not None, "No ResultMessage from review session"
     assert not result.is_error, (
-        f"Review session ended with error: {sdk.text(messages)[-500:]}"
+        f"Review session ended with error: {sdk.text(all_messages)[-500:]}"
     )
 
     session_id = result.session_id
-    report.add(session_id, sdk.metrics(messages), phase="Review")
-    sdk.log_phase("Review", messages, project_dir)
+
+    # ClaudeSDKClient may not trigger SessionEnd hook — finalize manually
+    audit.finalize(project_dir, session_id)
+
+    report.add(session_id, sdk.metrics(all_messages), phase="Review")
+    sdk.log_phase("Review", all_messages, project_dir)
 
     # Read the modified document
     output_text = doc_path.read_text(encoding="utf-8")
