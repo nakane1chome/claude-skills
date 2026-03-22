@@ -1,0 +1,84 @@
+# Test fixture manifest for event-sourcing-draft
+# Used to calibrate ablation detection for review-steps (preserve mode)
+
+skill: review-steps
+mode: preserve
+
+planted_concepts:
+  - event sourcing
+  - append-only log
+  - domain events
+  - aggregate
+  - event store
+  - event stream
+  - projection rebuilds
+  - materialized views
+  - snapshot compaction
+  - CQRS
+  - Command Query Responsibility Segregation
+  - command handler
+  - invariant validation
+  - DomainException
+  - read-model denormalization
+  - saga orchestration
+  - compensating transactions
+  - idempotency keys
+  - dead-letter queues
+  - correlation IDs
+  - backpressure queue
+  - poison event
+  - bounded contexts
+
+distinctive_terms:
+  - aggregate
+  - projection
+  - materialized
+  - snapshot
+  - compaction
+  - CQRS
+  - invariant
+  - DomainException
+  - denormalization
+  - saga
+  - compensating
+  - idempotency
+  - dead-letter
+  - correlation
+  - backpressure
+  - poison
+  - bounded
+
+ablated_replacements:
+  # Terms in the ablated version that replaced distinctive originals
+  event sourcing: event-based data storage
+  domain events: events
+  aggregate: component
+  event store: data store
+  projection rebuilds: rebuilding views
+  materialized views: pre-built datasets
+  snapshot compaction: data optimization
+  CQRS: separating reads and writes
+  command handler: handler
+  invariant validation: validation
+  DomainException: error
+  read-model denormalization: data restructuring
+  saga orchestration: workflow management
+  compensating transactions: rollback operations
+  idempotency keys: unique identifiers
+  dead-letter queues: error queues
+  correlation IDs: request identifiers
+  backpressure queue: queue
+  poison event: problematic event
+  bounded contexts: service areas
+
+expected:
+  good:
+    # Good review preserves domain vocabulary while fixing language issues
+    min_coverage: 0.9
+    min_lexical_overlap: 0.7
+  ablated:
+    # Ablated output replaces domain terms with generic equivalents.
+    # In preserve mode, sentences keep similar structure so function words
+    # (the, a, is, etc.) create a higher baseline overlap than expand mode.
+    min_coverage: 0.5
+    max_lexical_overlap: 0.65
