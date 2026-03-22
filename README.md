@@ -34,6 +34,31 @@ Components for recording and auditing agent activity across sessions.
 
 dev-record produces two tiers of audit data: **project artifacts** (`audit/dev_record/` — session summaries, agent reports, plan snapshots) that you commit to version control, and **operational detail** (`audit/ops_record/` — full event logs) that stays gitignored.
 
+Key dev-record capabilities:
+- **Hook-detected anomalies** — flags stop-word misuse, hallucinated paths, repeated tool failures, and unplanned file changes
+- **Agent self-reporting** — agents can log plan deviations, scope creep, and declined-difficult decisions via a helper script
+- **Plan-vs-actual diffing** — session finalization compares planned files against actual git changes and emits deviation events
+
+## Testing
+
+A multi-model E2E test framework for validating skills and plugins against real Claude sessions.
+
+```bash
+make test          # Run skill tests across model tiers (weakest, mid, strongest)
+make test-fw       # Run framework unit tests
+make test-all      # Run everything
+make open          # View HTML test report in browser
+```
+
+The framework lives in [`test_fw/`](test_fw/) as an installable Python package and provides:
+
+- **Claude SDK integration** — multi-turn conversation fixtures via pytest
+- **Audit inspection** — helpers for reading dev-record session summaries and event logs
+- **Ablation detection** — semantic analysis (TF-IDF embeddings, concept matching) to verify agents preserve meaning while transforming documents
+- **Multi-format reporting** — per-model JSON, Markdown, and HTML reports aggregated to `site/`
+
+CI runs via [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml) with results published to GitHub Pages.
+
 ## Installation
 
 ```bash
@@ -50,6 +75,10 @@ cp -r skills/review-steps ~/.claude/skills/
 # Plugin (load via CLI flag — no copy needed)
 claude --plugin-dir /path/to/claude-skills/skills/dev-record
 ```
+
+## Authoring Skills
+
+See [AUTHORING.md](AUTHORING.md) for conventions on writing new skills — directory layout, frontmatter fields, the stop-after-each-stage pattern, and description best practices.
 
 ## Links
 
