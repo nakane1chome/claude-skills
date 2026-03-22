@@ -1,3 +1,9 @@
 .claude
-tests/reports/
 __pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+tests/reports/
+tests/build/
+site/

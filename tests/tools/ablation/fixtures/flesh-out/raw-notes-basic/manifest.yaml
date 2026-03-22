@@ -1,0 +1,71 @@
+# Test fixture manifest for raw-notes-basic
+# Used to calibrate ablation detection thresholds
+
+skill: flesh-out
+mode: expand
+
+planted_concepts:
+  - tombstone propagation
+  - stale read windows
+  - consistent hashing
+  - hot-spot amplification
+  - write-behind caching
+  - LRU eviction
+  - scan-resistant workloads
+  - ARC
+  - LIRS
+  - jittered TTL
+  - thundering herd
+  - hierarchical caching
+  - serialization overhead
+  - vanity metric
+  - miss-penalty attribution
+  - invalidation races
+  - Zipkin trace correlation
+  - fan-out amplification
+
+distinctive_terms:
+  - tombstone
+  - coherence
+  - rebalancing
+  - durability
+  - scan-resistant
+  - jittered
+  - thundering herd
+  - serialization
+  - vanity metric
+  - attribution
+  - fan-out
+
+ablated_replacements:
+  # Terms in the ablated version that replaced distinctive originals
+  tombstone propagation: sending updates
+  stale read windows: windows where old data is served
+  consistent hashing: distribution method
+  hot-spot amplification: spread the load
+  write-behind caching: storing writes in the cache
+  LRU eviction: removal of least-recently-used items
+  scan-resistant: certain access patterns
+  ARC: better algorithms
+  LIRS: better algorithms
+  jittered TTL: adding randomness to expiration times
+  thundering herd: problem where many items expire at the same time
+  serialization overhead: overhead
+  vanity metric: not useful
+  miss-penalty attribution: tracking the cause of cache misses
+  invalidation races: update-related misses
+  Zipkin trace correlation: connecting request traces
+  fan-out amplification: hidden complexity
+
+expected:
+  good:
+    # Good output should preserve concepts and vocabulary
+    min_coverage: 0.8
+    min_lexical_overlap: 0.4
+    max_ablation_risk: 0.15
+  ablated:
+    # Ablated output should trigger detection. With TF-IDF (lexical), heavy
+    # vocabulary replacement drops some concepts below match threshold.
+    min_coverage: 0.5          # meaning partially recoverable
+    max_lexical_overlap: 0.45  # words are replaced
+    min_ablation_risk: 0.10    # ablation signature present
