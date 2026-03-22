@@ -123,7 +123,7 @@ fi
 # Re-read agent reports after plan-diff events may have been appended
 AGENT_REPORTS=$(jq -s '[.[] | select(.type == "agent_report") | .content]' "$LOG_FILE")
 
-# Update summary with final agent reports
+# Write session summary to dev_record (project artifact)
 jq -n \
   --arg sid "$SESSION_ID" \
   --argjson started "${STARTED:-\"$TIMESTAMP\"}" \

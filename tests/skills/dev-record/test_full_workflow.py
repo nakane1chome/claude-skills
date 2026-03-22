@@ -182,4 +182,3 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
             f"Agent reports found: {[e.get('content', {}).get('event') for e in agent_reports]}",
             stacklevel=1,
         )
-
