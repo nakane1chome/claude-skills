@@ -98,7 +98,7 @@ jobs:
       - name: Job summary
         if: always()
         run: |
-          aci="https://www.artifact.ci/artifact/view/${{ github.repository }}/run/${{ github.run_id }}.1"
+          pages="https://www.shincbm.com/claude-skills/runs/${{ github.run_id }}/${{ matrix.model }}"
           md_file=$(ls tests/reports/*${{ matrix.model }}*.summary.md 2>/dev/null | head -1)
 
           if [ -n "$md_file" ]; then
@@ -110,7 +110,7 @@ jobs:
           fi
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "[Report](${aci}/report-${{ matrix.model }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[pytest](${pages}/pytest-${{ matrix.model }}.html?sort=result) | [index](https://www.shincbm.com/claude-skills/)" >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: test
