@@ -1,4 +1,4 @@
-name: E2E Tests (dev-record)
+name: E2E Tests
 
 on:
   workflow_dispatch:
@@ -62,11 +62,12 @@ jobs:
         run: pip install ./tests
 
       - name: Run E2E tests
+        working-directory: tests
         run: |
-          pytest tests/skills/dev-record/ \
+          pytest skills/ \
             --model ${{ matrix.model }} \
             --basetemp /tmp/pytest-sandbox \
-            --html tests/reports/pytest-${{ matrix.model }}.html \
+            --html reports/pytest-${{ matrix.model }}.html \
             --self-contained-html \
             -v -s
 
@@ -86,19 +87,18 @@ jobs:
           find /tmp/pytest-sandbox/ -name '*:*' -exec bash -c 'mv "$1" "${1//:/-}"' _ {} \; 2>/dev/null || true
 
       - name: Upload sandbox
-        id: upload-sandbox
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sandbox-${{ matrix.model }}
-          path: /tmp/pytest-sandbox/test_full_workflow0/project/
+          path: /tmp/pytest-sandbox/
           if-no-files-found: ignore
           include-hidden-files: true
 
       - name: Job summary
         if: always()
         run: |
-          aci="https://www.artifact.ci/artifact/view/${{ github.repository }}/run/${{ github.run_id }}.1"
+          pages="https://www.shincbm.com/claude-skills/runs/${{ github.run_id }}/${{ matrix.model }}"
           md_file=$(ls tests/reports/*${{ matrix.model }}*.summary.md 2>/dev/null | head -1)
 
           if [ -n "$md_file" ]; then
@@ -110,7 +110,7 @@ jobs:
           fi
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "[Report](${aci}/report-${{ matrix.model }}) · [Sandbox](${aci}/sandbox-${{ matrix.model }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[pytest](${pages}/pytest-${{ matrix.model }}.html?sort=result) | [index](https://www.shincbm.com/claude-skills/)" >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: test
@@ -156,31 +156,40 @@ jobs:
           run_dir="site/runs/${{ github.run_id }}"
           mkdir -p "$run_dir"
 
+          # Write run metadata
+          cat > "$run_dir/meta.json" <<METAEOF
+          {
+            "date": "$(date -u +%Y-%m-%d)",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "run_id": "${{ github.run_id }}"
+          }
+          METAEOF
+
           # Process each report artifact (named report-{model})
           for report_dir in artifacts/reports/report-*/; do
             [ -d "$report_dir" ] || continue
             model=$(basename "$report_dir" | sed 's/^report-//')
             mkdir -p "$run_dir/$model"
             cp "$report_dir"/* "$run_dir/$model/" 2>/dev/null || true
-
-            # Post-process custom HTML report: prefix sandbox/ to href attributes
-            # so file tree links resolve correctly on Pages
-            for report in "$run_dir/$model"/skills-*.html; do
-              [ -f "$report" ] || continue
-              sed -i 's|href="|href="sandbox/|g' "$report"
-            done
           done
 
           # Process each sandbox artifact (named sandbox-{model})
+          # Sandbox contains pytest tmp dirs; find project dirs and copy them
           for sandbox_dir in artifacts/sandboxes/sandbox-*/; do
             [ -d "$sandbox_dir" ] || continue
             model=$(basename "$sandbox_dir" | sed 's/^sandbox-//')
-            mkdir -p "$run_dir/$model/sandbox"
-            cp -r "$sandbox_dir"/* "$run_dir/$model/sandbox/" 2>/dev/null || true
+            # Each test creates a project/ dir inside its basetemp subdir
+            for project_dir in "$sandbox_dir"/*/project/; do
+              [ -d "$project_dir" ] || continue
+              # Use the test dir name (e.g. test_full_workflow0) as namespace
+              test_name=$(basename "$(dirname "$project_dir")")
+              mkdir -p "$run_dir/$model/sandbox/$test_name"
+              cp -r "$project_dir"/* "$run_dir/$model/sandbox/$test_name/" 2>/dev/null || true
+            done
           done
 
           echo "Assembled run directory:"
-          ls -la "$run_dir"/*/
+          find "$run_dir" -maxdepth 3 -type d | head -30
 
       - name: Generate index
         run: python .github/scripts/generate-pages-index.py site/
