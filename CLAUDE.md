@@ -31,8 +31,17 @@ Each component lives in `skills/<name>/` and contains:
 
 | Component | Type | Purpose |
 |-----------|------|---------|
-| **dev-record** | Plugin | Passive session recording — plans, input, decisions, deviations |
+| **dev-record** | Plugin | Passive session recording — plans, input, decisions, deviations, anomaly detection, agent self-reporting |
 | **review-skill** | Skill | Review a SKILL.md for quality and convention alignment |
+
+## Testing
+
+E2E tests validate skills and plugins against real Claude sessions across model tiers.
+
+- `test_fw/` — reusable pytest framework (Claude SDK integration, audit inspection, ablation detection)
+- `tests/` — per-skill E2E tests that depend on `test_fw`
+- `make test` runs skill tests across model tiers; `make test-fw` runs framework unit tests; `make test-all` runs both
+- CI: `.github/workflows/e2e-tests.yml` publishes HTML reports to GitHub Pages
 
 ## Conventions
 
@@ -41,6 +50,7 @@ Each component lives in `skills/<name>/` and contains:
 - Infrastructure skills (e.g. dev-record) use an **action-dispatch** pattern — the user specifies an action to run
 - Skills with a `responsibilities.md` define which stages the agent leads vs assists on
 - Skills are composable: `flesh-out` a skeleton, then `review-steps` the result, then `strong-edit` the final draft
+- See `AUTHORING.md` for the full style guide on writing new skills (directory layout, frontmatter, description conventions)
 
 ## License
 
