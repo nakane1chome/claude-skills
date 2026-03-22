@@ -1,45 +1,68 @@
-"""Test: review-skill identifies seeded issues in a deliberately flawed SKILL.md."""
+"""Test: review-skill identifies seeded issues in a deliberately flawed SKILL.md.
+
+Uses multi-turn conversation to respond to the skill's stop-after-each-stage
+pattern with approval messages, mimicking a real developer interaction.
+"""
 
 import re
-import shutil
 from pathlib import Path
 
 import pytest
+from claude_agent_sdk.types import ResultMessage
 
-FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "review_skill"
 
 REVIEW_PROMPT = """\
 /review-skill flawed-skill
 
-Complete all review stages (0 through 5) without stopping between stages.
-Do NOT apply any fixes — just report findings for every stage, then provide the final summary.
-When you would normally stop for developer review, instead continue immediately to the next stage.
+Complete all review stages (0 through 5).
+Report findings for every stage, then provide the final summary.
 """
 
+CONTINUE_PROMPT = "Please proceed as suggested."
 
-async def test_review_finds_seeded_issues(sandbox_project, claude_query, sdk):
+MAX_FOLLOW_UPS = 8
+
+
+async def test_review_finds_seeded_issues(
+    review_skill_project, sdk, model, model_alias, report, audit,
+):
     """Invoke review-skill on a flawed fixture and verify seeded issues are found."""
-    # Copy flawed fixture into the sandbox project root (where review-skill can find it)
-    dest = sandbox_project / "flawed-skill"
-    shutil.copytree(FIXTURES_DIR / "flawed-skill", dest)
+    project_dir, query_fn = review_skill_project
 
-    messages = await claude_query(
-        REVIEW_PROMPT,
-        max_turns=25,
+    report.configure(
+        project_dir=project_dir, model=model, model_alias=model_alias,
+        title="Review-Skill Seeded Issues Test", test_file=Path(__file__),
     )
 
-    result = sdk.result(messages)
+    # Multi-turn: send initial prompt, then respond with approvals
+    # when the skill pauses for developer review between stages
+    async with query_fn.conversation(max_turns=25) as conv:
+        await conv.say(REVIEW_PROMPT)
+
+        for _ in range(MAX_FOLLOW_UPS):
+            await conv.say(CONTINUE_PROMPT)
+
+    all_messages = conv.messages
+    # With multi-turn, use the last ResultMessage (final session state)
+    results = [m for m in all_messages if isinstance(m, ResultMessage)]
+    result = results[-1] if results else None
     assert result is not None, "No ResultMessage returned"
     assert not result.is_error, (
-        f"Review session ended with error: {sdk.text(messages)[-500:]}"
+        f"Review session ended with error: {sdk.text(all_messages)[-500:]}"
     )
 
-    text = sdk.text(messages).lower()
+    session_id = result.session_id
+
+    # ClaudeSDKClient may not trigger SessionEnd hook — finalize manually
+    audit.finalize(project_dir, session_id)
+
+    report.add(session_id, sdk.metrics(all_messages), phase="Review")
+    sdk.log_phase("review-skill", all_messages, project_dir)
+
+    text = sdk.text(all_messages).lower()
     assert len(text) > 100, (
         f"Response too short ({len(text)} chars) — review likely did not run"
     )
-
-    sdk.log_phase("review-skill", messages, sandbox_project)
 
     # Each seeded issue maps to keyword checks on the full response.
     # We collect which issues were detected, then assert a minimum threshold.
