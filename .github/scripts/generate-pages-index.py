@@ -47,15 +47,10 @@ def _find_reports(model_dir: Path) -> list[dict]:
     """
     reports = []
     for f in sorted(model_dir.glob("skills-*.html")):
-        stem = f.stem  # e.g. skills-dev-record-full_workflow-weakest
-        # Strip 'skills-' prefix
+        stem = f.stem
         remainder = stem.removeprefix("skills-")
-        # Strip '-{model_alias}' suffix (last hyphen-separated segment)
-        # Then split skill-dir from test-name at the rightmost hyphen
         parts = remainder.rsplit("-", 1)
         if len(parts) == 2:
-            # parts[0] = 'dev-record-full_workflow', parts[1] = model alias
-            # Now split skill name from test name at the last hyphen in parts[0]
             skill_parts = parts[0].rsplit("-", 1)
             label = "/".join(skill_parts) if len(skill_parts) == 2 else parts[0]
         else:
@@ -68,6 +63,23 @@ def _find_pytest_report(model_dir: Path) -> str | None:
     """Find the single pytest HTML report file."""
     for f in model_dir.glob("pytest-*.html"):
         return f.name
+    return None
+
+
+def _metrics_for_stem(all_metrics: list[dict], stem: str) -> dict | None:
+    """Find metrics matching a specific report stem."""
+    for entry in all_metrics:
+        if entry["stem"] == stem:
+            return entry["metrics"].get("totals", {})
+    return None
+
+
+def _model_id(all_metrics: list[dict]) -> str | None:
+    """Extract the actual model ID from metrics data."""
+    for entry in all_metrics:
+        model = entry["metrics"].get("model")
+        if model:
+            return model
     return None
 
 
@@ -85,6 +97,14 @@ def _aggregate_totals(all_metrics: list[dict]) -> dict:
     agg["duration_s"] = round(agg["duration_s"], 1)
     agg["cost_usd"] = round(agg["cost_usd"], 4)
     return agg
+
+
+def _fmt_metrics(totals: dict) -> str:
+    """Format totals as a compact string."""
+    cost = f"${totals['cost_usd']:.4f}"
+    dur = f"{totals['duration_s']:.0f}s"
+    turns = f"{totals['num_turns']}t"
+    return f"{cost} &middot; {dur} &middot; {turns}"
 
 
 def generate_index(site_dir: Path) -> None:
@@ -127,6 +147,16 @@ def generate_index(site_dir: Path) -> None:
             }
         runs.append({"run_id": run_id, "meta": meta, "models": models})
 
+    # Collect all test labels across all runs for consistent rows
+    all_test_labels: list[str] = []
+    seen_labels: set[str] = set()
+    for run in runs:
+        for mdata in run["models"].values():
+            for cr in mdata["custom_reports"]:
+                if cr["label"] not in seen_labels:
+                    seen_labels.add(cr["label"])
+                    all_test_labels.append(cr["label"])
+
     # Generate HTML
     parts: list[str] = []
     parts.append("""<!DOCTYPE html>
@@ -139,16 +169,24 @@ def generate_index(site_dir: Path) -> None:
   table { border-collapse: collapse; width: 100%; margin: 12px 0; }
   th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; font-size: 14px; }
   th { background: #f3f4f6; font-weight: 600; }
-  tr:nth-child(even) { background: #f9fafb; }
   .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
           font-size: 13px; }
   .meta { color: #6b7280; font-size: 13px; }
-  a { color: #2563eb; text-decoration: none; }
+  a { color: #2563eb; text-decoration: none; font-weight: 500; }
   a:hover { text-decoration: underline; }
-  .links { font-size: 12px; }
-  .links a { margin-right: 8px; }
   .model-header { text-align: center; }
   .na { color: #9ca3af; font-style: italic; }
+  .test-name { font-weight: 500; }
+  .test-name.pytest { color: #16a34a; }
+  .metrics { color: #6b7280; font-size: 12px; display: block; margin-top: 2px; }
+  .cell-link { font-size: 14px; }
+  .cell-link a { font-size: 14px; }
+  .model-id { color: #9ca3af; font-size: 11px; display: block; margin-top: 2px;
+              font-family: "SFMono-Regular", Consolas, monospace; }
+  .run-id { vertical-align: top; }
+  .totals-row { border-top: 2px solid #9ca3af; }
+  .totals-label { font-weight: 600; color: #374151; }
+  .run-group { border-top: 3px solid #6b7280; }
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
                gap: 12px; margin: 16px 0; }
   .stat-card { background: #f3f4f6; border-radius: 8px; padding: 12px 16px; }
@@ -171,55 +209,113 @@ def generate_index(site_dir: Path) -> None:
                      f'<div class="value">{len(all_models)}</div></div>')
         parts.append('</div>')
 
-        # Runs table
+        # Header row
         parts.append("<table><tr>")
-        parts.append("<th>Run ID</th><th>Date</th>")
+        parts.append("<th>Run</th><th>Date</th><th>Test</th>")
         for model in all_models:
-            parts.append(f'<th class="model-header" colspan="2">{h(model)}</th>')
-        parts.append("</tr>")
-
-        # Sub-header row for metrics + links
-        parts.append("<tr><th></th><th></th>")
-        for _ in all_models:
-            parts.append("<th>Metrics</th><th>Links</th>")
+            parts.append(f'<th class="model-header">{h(model)}</th>')
         parts.append("</tr>")
 
         for run in runs:
             run_id = run["run_id"]
             ts = run["meta"].get("timestamp", "")
             date = ts[:16].replace("T", " ") if ts else run["meta"].get("date", "-")
-            parts.append("<tr>")
-            parts.append(f'<td class="mono">{h(run_id)}</td>')
-            parts.append(f'<td class="mono">{h(date)}</td>')
+
+            # Build rows: pytest + each test report + totals
+            # Count rows for rowspan: pytest + test reports + totals
+            has_pytest = any(
+                run["models"].get(m, {}).get("pytest_report")
+                for m in all_models
+            )
+            num_rows = len(all_test_labels) + (1 if has_pytest else 0) + 1  # +1 for totals
+            first_row = True
+
+            # pytest row
+            if has_pytest:
+                parts.append(f'<tr class="run-group">')
+                if first_row:
+                    parts.append(
+                        f'<td class="mono run-id" rowspan="{num_rows}">{h(run_id)}</td>'
+                        f'<td class="mono run-id" rowspan="{num_rows}">{h(date)}</td>'
+                    )
+                    first_row = False
+                parts.append('<td class="test-name pytest">pytest</td>')
+                for model in all_models:
+                    mdata = run["models"].get(model)
+                    if mdata and mdata["pytest_report"]:
+                        base = f"runs/{run_id}/{model}"
+                        href = f'{base}/{mdata["pytest_report"]}'
+                        mid = _model_id(mdata["all_metrics"])
+                        mid_str = f'<span class="model-id">{h(mid)}</span>' if mid else ""
+                        parts.append(
+                            f'<td class="cell-link">'
+                            f'<a href="{href}">results</a>{mid_str}</td>'
+                        )
+                    else:
+                        parts.append('<td class="na">\u2014</td>')
+                parts.append("</tr>")
+
+            # Test report rows
+            for label in all_test_labels:
+                row_class = ' class="run-group"' if first_row else ""
+                parts.append(f"<tr{row_class}>")
+                if first_row:
+                    parts.append(
+                        f'<td class="mono run-id" rowspan="{num_rows}">{h(run_id)}</td>'
+                        f'<td class="mono run-id" rowspan="{num_rows}">{h(date)}</td>'
+                    )
+                    first_row = False
+                parts.append(f'<td class="test-name">{h(label)}</td>')
+                for model in all_models:
+                    mdata = run["models"].get(model)
+                    if mdata is None:
+                        parts.append('<td class="na">\u2014</td>')
+                        continue
+                    # Find matching report and metrics
+                    report = next(
+                        (cr for cr in mdata["custom_reports"] if cr["label"] == label),
+                        None,
+                    )
+                    if report:
+                        base = f"runs/{run_id}/{model}"
+                        href = f'{base}/{report["filename"]}'
+                        # Find per-test metrics
+                        stem = report["filename"].removesuffix(".html")
+                        totals = _metrics_for_stem(mdata["all_metrics"], stem)
+                        metrics_str = ""
+                        if totals:
+                            cost = f"${totals.get('cost_usd', 0):.4f}"
+                            dur = f"{totals.get('duration_s', 0):.0f}s"
+                            turns = f"{totals.get('num_turns', 0)}t"
+                            metrics_str = (
+                                f'<span class="metrics">'
+                                f'{cost} &middot; {dur} &middot; {turns}</span>'
+                            )
+                        parts.append(
+                            f'<td class="cell-link">'
+                            f'<a href="{href}">report</a>{metrics_str}</td>'
+                        )
+                    else:
+                        parts.append('<td class="na">\u2014</td>')
+                parts.append("</tr>")
+
+            # Totals row
+            parts.append("<tr class=\"totals-row\">")
+            if first_row:
+                parts.append(
+                    f'<td class="mono run-id" rowspan="{num_rows}">{h(run_id)}</td>'
+                    f'<td class="mono run-id" rowspan="{num_rows}">{h(date)}</td>'
+                )
+            parts.append('<td class="totals-label">total</td>')
             for model in all_models:
                 mdata = run["models"].get(model)
-                if mdata is None:
-                    parts.append('<td class="na">-</td><td class="na">-</td>')
-                    continue
-                # Metrics cell — aggregate across all JSON files
-                all_metrics = mdata["all_metrics"]
-                if all_metrics:
-                    t = _aggregate_totals(all_metrics)
-                    cost = f"${t['cost_usd']:.4f}"
-                    dur = f"{t['duration_s']:.0f}s"
-                    turns = t["num_turns"]
-                    parts.append(
-                        f'<td class="mono">{cost} &middot; {dur} &middot; '
-                        f'{turns}t</td>'
-                    )
+                if mdata and mdata["all_metrics"]:
+                    t = _aggregate_totals(mdata["all_metrics"])
+                    parts.append(f'<td class="mono">{_fmt_metrics(t)}</td>')
                 else:
-                    parts.append('<td class="na">no metrics</td>')
-                # Links cell — one link per custom report + pytest
-                links: list[str] = []
-                base = f"runs/{run_id}/{model}"
-                for cr in mdata["custom_reports"]:
-                    links.append(
-                        f'<a href="{base}/{cr["filename"]}">{h(cr["label"])}</a>'
-                    )
-                if mdata["pytest_report"]:
-                    links.append(f'<a href="{base}/{mdata["pytest_report"]}">pytest</a>')
-                parts.append(f'<td class="links">{"<br>".join(links) if links else "-"}</td>')
+                    parts.append('<td class="na">\u2014</td>')
             parts.append("</tr>")
+
         parts.append("</table>")
 
     parts.append("</body></html>")
