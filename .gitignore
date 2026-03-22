@@ -6,4 +6,5 @@ __pycache__/
 .pytest_cache/
 tests/reports/
 tests/build/
+test_fw/build/
 site/

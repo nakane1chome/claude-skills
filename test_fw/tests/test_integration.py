@@ -4,12 +4,14 @@ from pathlib import Path
 
 import yaml
 
-from .chunker import chunk_markdown
-from .embedder import TfidfEmbedder
-from .matcher import greedy_match
-from .scorer import score_document
+from claude_test_fw.ablation.chunker import chunk_markdown
+from claude_test_fw.ablation.embedder import TfidfEmbedder
+from claude_test_fw.ablation.matcher import greedy_match
+from claude_test_fw.ablation.scorer import score_document
 
-FIXTURE_DIR = Path(__file__).parent / "fixtures" / "flesh-out" / "raw-notes-basic"
+import claude_test_fw.ablation as _ablation_pkg
+
+FIXTURE_DIR = Path(_ablation_pkg.__file__).resolve().parent / "fixtures" / "flesh-out" / "raw-notes-basic"
 
 
 def _run_comparison(input_path: Path, output_path: Path):

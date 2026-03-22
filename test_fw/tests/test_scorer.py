@@ -1,8 +1,8 @@
 """Tests for the scoring module."""
 
-from .chunker import ConceptUnit
-from .matcher import Match, MatchResult
-from .scorer import lexical_overlap, ablation_risk, score_pair, score_document
+from claude_test_fw.ablation.chunker import ConceptUnit
+from claude_test_fw.ablation.matcher import Match, MatchResult
+from claude_test_fw.ablation.scorer import lexical_overlap, ablation_risk, score_pair, score_document
 
 import numpy as np
 

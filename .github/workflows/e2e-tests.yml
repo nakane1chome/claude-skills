@@ -59,7 +59,9 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Install test dependencies
-        run: pip install ./tests
+        run: |
+          pip install ./test_fw
+          pip install ./tests
 
       - name: Run E2E tests
         working-directory: tests

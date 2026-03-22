@@ -9,10 +9,10 @@ from pathlib import Path
 
 import yaml
 
-from tools.ablation.chunker import chunk_markdown
-from tools.ablation.embedder import TfidfEmbedder
-from tools.ablation.matcher import greedy_match
-from tools.ablation.scorer import score_document
+from claude_test_fw.ablation.chunker import chunk_markdown
+from claude_test_fw.ablation.embedder import TfidfEmbedder
+from claude_test_fw.ablation.matcher import greedy_match
+from claude_test_fw.ablation.scorer import score_document
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "event-sourcing-draft"
 
