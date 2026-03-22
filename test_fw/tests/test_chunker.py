@@ -1,6 +1,6 @@
 """Tests for the markdown chunker."""
 
-from .chunker import chunk_markdown, ConceptUnit
+from claude_test_fw.ablation.chunker import chunk_markdown, ConceptUnit
 
 
 def test_empty_input():
