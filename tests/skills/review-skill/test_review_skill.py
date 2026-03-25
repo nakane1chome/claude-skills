@@ -31,7 +31,7 @@ async def test_review_finds_seeded_issues(
 
     report.configure(
         project_dir=project_dir, model=model, model_alias=model_alias,
-        title="Review-Skill Seeded Issues Test", test_file=Path(__file__),
+        test_file=Path(__file__),
     )
 
     # Multi-turn: send initial prompt, then respond with approvals
@@ -52,6 +52,7 @@ async def test_review_finds_seeded_issues(
     )
 
     session_id = result.session_id
+    report.check("no error", not result.is_error, session_id=session_id, phase="Review")
 
     # ClaudeSDKClient may not trigger SessionEnd hook — finalize manually
     audit.finalize(project_dir, session_id)
@@ -60,13 +61,16 @@ async def test_review_finds_seeded_issues(
     sdk.log_phase("review-skill", all_messages, project_dir)
 
     text = sdk.text(all_messages).lower()
+    report.check("response length > 100", len(text) > 100,
+                 session_id=session_id, phase="Review",
+                 detail=f"{len(text)} chars")
     assert len(text) > 100, (
         f"Response too short ({len(text)} chars) — review likely did not run"
     )
 
     # Each seeded issue maps to keyword checks on the full response.
     # We collect which issues were detected, then assert a minimum threshold.
-    checks = {
+    issue_checks = {
         "name-kebab": bool(re.search(r"kebab|camel.?case|naming", text)),
         "description-vague": bool(re.search(r"vague|broad|generic|specific|trigger", text)),
         "argument-hint-missing": bool(re.search(r"argument.?hint", text)),
@@ -75,8 +79,16 @@ async def test_review_finds_seeded_issues(
         "unreferenced-file": bool(re.search(r"unreferenc|unused|not.referenc|orphan", text)),
     }
 
-    found = [name for name, detected in checks.items() if detected]
-    missed = [name for name, detected in checks.items() if not detected]
+    found = [name for name, detected in issue_checks.items() if detected]
+    missed = [name for name, detected in issue_checks.items() if not detected]
+
+    # Record each seeded issue as a check
+    for name, detected in issue_checks.items():
+        report.check(f"seeded issue: {name}", detected, phase="Verification")
+
+    report.check(f">= 4 of 6 seeded issues found", len(found) >= 4,
+                 phase="Verification",
+                 detail=f"found {len(found)}/6: {', '.join(found)}")
 
     # Require at least 4 of 6 — allows for model variation across tiers
     assert len(found) >= 4, (

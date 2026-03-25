@@ -1,7 +1,7 @@
 SITE_DIR := site
 MODELS ?= weakest mid strongest
 
-.PHONY: help install test test-fw test-all open clean
+.PHONY: help install test test-weak test-mid test-strong test-fw test-all open clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -32,6 +32,15 @@ test: ## Run skill tests for all model tiers (override with MODELS="weakest mid"
 	done; \
 	python $(CURDIR)/.github/scripts/generate-pages-index.py $(CURDIR)/$(SITE_DIR); \
 	exit $$fail
+
+test-weak: ## Run skill tests for weakest model tier only
+	$(MAKE) test MODELS=weakest
+
+test-mid: ## Run skill tests for mid model tier only
+	$(MAKE) test MODELS=mid
+
+test-strong: ## Run skill tests for strongest model tier only
+	$(MAKE) test MODELS=strongest
 
 test-all: test-fw test ## Run all tests (framework + skills)
 
