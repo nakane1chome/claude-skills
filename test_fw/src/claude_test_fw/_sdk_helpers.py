@@ -52,7 +52,8 @@ class SDKHelpers:
                 }
         return {}
 
-    def log_phase(self, phase: str, messages: list, project_dir: Path) -> None:
+    def log_phase(self, phase: str, messages: list, project_dir: Path,
+                  *, skill: str | None = None) -> None:
         """Print a compact phase summary for CI log visibility."""
         result = self.result(messages)
         m = self.metrics(messages)
@@ -62,7 +63,10 @@ class SDKHelpers:
         cost = m.get("total_cost_usd")
 
         print(f"\n{'='*60}")
-        print(f"Phase: {phase}")
+        if skill:
+            print(f"Skill: {skill}  |  Phase: {phase}")
+        else:
+            print(f"Phase: {phase}")
         print(f"  session: {result.session_id if result else '?'}")
         print(f"  turns: {turns}  duration: {dur/1000:.1f}s  cost: ${cost:.4f}" if cost else
               f"  turns: {turns}  duration: {dur/1000:.1f}s")

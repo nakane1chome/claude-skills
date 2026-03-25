@@ -64,7 +64,7 @@ async def test_review_preserves_vocabulary(
 
     report.configure(
         project_dir=project_dir, model=model, model_alias=model_alias,
-        title="Review-Steps Ablation Test", test_file=Path(__file__),
+        test_file=Path(__file__),
     )
 
     # Multi-turn: send initial prompt, then respond with approvals
@@ -87,6 +87,7 @@ async def test_review_preserves_vocabulary(
     )
 
     session_id = result.session_id
+    report.check("no error", not result.is_error, session_id=session_id, phase="Review")
 
     # ClaudeSDKClient may not trigger SessionEnd hook — finalize manually
     audit.finalize(project_dir, session_id)
@@ -96,6 +97,8 @@ async def test_review_preserves_vocabulary(
 
     # Read the modified document
     output_text = doc_path.read_text(encoding="utf-8")
+    report.check("document modified", output_text != input_text,
+                 session_id=session_id, phase="Review")
     assert output_text != input_text, "Document was not modified by review"
 
     # Run ablation analysis
@@ -107,15 +110,21 @@ async def test_review_preserves_vocabulary(
     # Preserve mode: review should fix language without replacing vocabulary.
     # Thresholds are slightly relaxed vs the static fixture tests because
     # Claude may restructure sentences more than the hand-crafted expected-good.
+    report.check("coverage >= 0.7", score.coverage >= 0.7,
+                 phase="Ablation", detail=f"{score.coverage:.3f}")
     assert score.coverage >= 0.7, (
         f"Coverage too low: {score.coverage:.3f} (expected >= 0.7). "
         f"Review may have restructured too aggressively."
     )
+    report.check("lexical overlap >= 0.4", score.mean_lexical_overlap >= 0.4,
+                 phase="Ablation", detail=f"{score.mean_lexical_overlap:.3f}")
     assert score.mean_lexical_overlap >= 0.4, (
         f"Lexical overlap too low: {score.mean_lexical_overlap:.3f} "
         f"(expected >= 0.4). "
         f"Review may have replaced domain-specific vocabulary."
     )
+    report.check("ablation risk < 0.35", score.mean_ablation_risk < 0.35,
+                 phase="Ablation", detail=f"{score.mean_ablation_risk:.3f}")
     assert score.mean_ablation_risk < 0.35, (
         f"Ablation risk too high: {score.mean_ablation_risk:.3f} "
         f"(expected < 0.35). "

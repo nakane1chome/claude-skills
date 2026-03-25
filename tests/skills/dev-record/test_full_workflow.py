@@ -44,7 +44,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     project_dir, claude_query = installed_project
 
     report.configure(project_dir=project_dir, model=model, model_alias=model_alias,
-                     title="Full Workflow Test Report", test_file=Path(__file__))
+                     test_file=Path(__file__))
 
     session_ids = []
 
@@ -58,6 +58,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     )
     plan_session_id = sdk.session_id(plan_messages)
     assert plan_session_id is not None, "No session_id from plan phase"
+    report.check("session_id returned", True, session_id=plan_session_id, phase="Plan")
     session_ids.append(plan_session_id)
     report.add(plan_session_id, sdk.metrics(plan_messages), phase="Plan")
     sdk.log_phase("Plan", plan_messages, project_dir)
@@ -75,12 +76,16 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
         f"Implementation phase ended with error: {sdk.text(impl_messages)[-500:]}"
     )
     impl_session_id = impl_result.session_id
+    report.check("no error", not impl_result.is_error, session_id=impl_session_id, phase="Implement")
     session_ids.append(impl_session_id)
     report.add(impl_session_id, sdk.metrics(impl_messages), phase="Implement")
     sdk.log_phase("Implement", impl_messages, project_dir)
 
     # Verify at least one test file was created
     test_files = list(project_dir.glob("**/test_*.py"))
+    report.check("test file created", len(test_files) >= 1,
+                 session_id=impl_session_id, phase="Implement",
+                 detail=f"found {len(test_files)} test file(s)")
     assert len(test_files) >= 1, (
         f"No test_*.py file created during implementation. "
         f"project_dir={project_dir}, "
@@ -134,6 +139,8 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
 
     # Assert user_prompt events exist (>= 3, one per phase)
     user_prompts = [e for e in all_events if e["type"] == "user_prompt"]
+    report.check(">= 3 user_prompt events", len(user_prompts) >= 3,
+                 phase="Audit", detail=f"found {len(user_prompts)}")
     assert len(user_prompts) >= 3, (
         f"Expected >= 3 user_prompt events across 3 sessions, got {len(user_prompts)}"
     )
@@ -142,9 +149,13 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     tool_calls = [e for e in all_events if e["type"] == "tool_call"]
     tool_names = {e["content"]["tool"] for e in tool_calls}
     has_write_or_edit = bool(tool_names & {"Write", "Edit"})
+    report.check("Write or Edit in tool calls", has_write_or_edit,
+                 phase="Audit", detail=f"tools: {', '.join(sorted(tool_names))}")
     assert has_write_or_edit, (
         f"Expected Write or Edit in tool calls, got tools: {tool_names}"
     )
+    report.check("Bash in tool calls", "Bash" in tool_names,
+                 phase="Audit", detail=f"tools: {', '.join(sorted(tool_names))}")
     assert "Bash" in tool_names, (
         f"Expected Bash in tool calls (for pytest), got tools: {tool_names}"
     )
@@ -153,6 +164,8 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     # from plan to implementation within a single session. With separate query() calls
     # for plan and implement, the model stays in plan mode until the session ends.
     plan_snapshots = [e for e in all_events if e["type"] == "plan_snapshot"]
+    report.check("plan_snapshot events", len(plan_snapshots) > 0,
+                 phase="Audit", detail=f"found {len(plan_snapshots)} (soft)")
     if not plan_snapshots:
         import warnings
         warnings.warn(
@@ -163,6 +176,9 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
 
     # Phase 3 summary should have plan_snapshots == 0 (no plan mode in phase 3)
     phase3_summary = audit.read_summary(project_dir, extend_session_id)
+    report.check("phase 3: no plan_snapshots", phase3_summary["plan_snapshots"] == 0,
+                 session_id=extend_session_id, phase="Extend",
+                 detail=f"got {phase3_summary['plan_snapshots']}")
     assert phase3_summary["plan_snapshots"] == 0, (
         f"Phase 3 should have 0 plan_snapshots, got {phase3_summary['plan_snapshots']}"
     )
@@ -174,6 +190,9 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
         e for e in agent_reports
         if e.get("content", {}).get("event") == "ignored_prior_failure"
     ]
+    report.check("agent_report: ignored_prior_failure", len(ignored_failures) > 0,
+                 phase="Audit",
+                 detail=f"found {len(ignored_failures)} (soft)")
     if not ignored_failures:
         import warnings
         warnings.warn(

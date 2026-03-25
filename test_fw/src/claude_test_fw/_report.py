@@ -28,6 +28,7 @@ class ReportCollector:
         self.report_paths: dict[str, Path] = {}
         self._sessions: list[dict] = []
         self._custom: dict[str, dict] = {}
+        self._checks: list[dict] = []
         self._project_dir: Path | None = None
         self._model: str | None = None
         self._model_alias: str | None = None
@@ -35,15 +36,43 @@ class ReportCollector:
         self._test_file: Path | None = None
         self._sandbox_dir: str | None = None
         self._html_generator = None
+        self._test_name: str | None = None
+        self._test_description: str | None = None
+        self._skill_under_test: str | None = None
 
     def configure(self, *, project_dir: Path, model: str, model_alias: str,
-                  title: str, test_file: Path) -> None:
+                  test_file: Path,
+                  title: str | None = None,
+                  test_name: str | None = None,
+                  test_description: str | None = None) -> None:
         self._project_dir = project_dir
         self._model = model
         self._model_alias = model_alias
-        self._title = title
         self._test_file = test_file
         self._sandbox_dir = project_dir.parent.name
+        self._test_name = test_name
+        self._test_description = test_description
+
+        # Auto-derive skill under test from test file path:
+        # tests/skills/<skill-name>/test_*.py → <skill-name>
+        self._skill_under_test = self._derive_skill(test_file)
+
+        # Auto-generate title if not provided
+        skill = self._skill_under_test or "unknown"
+        test = self._test_name or test_file.stem.removeprefix("test_")
+        self._title = title or f"{skill} / {test}"
+
+    @staticmethod
+    def _derive_skill(test_file: Path) -> str | None:
+        """Derive the skill name from the test file path."""
+        parts = test_file.resolve().parts
+        try:
+            idx = parts.index("skills")
+            if idx + 1 < len(parts) - 1:
+                return parts[idx + 1]
+        except ValueError:
+            pass
+        return None
 
     def set_html_generator(self, fn) -> None:
         """Set an optional HTML report generator.
@@ -63,6 +92,27 @@ class ReportCollector:
     def add_custom(self, key: str, data: dict) -> None:
         """Attach domain-specific metrics under *key*."""
         self._custom[key] = data
+
+    def check(self, name: str, passed: bool, *,
+              detail: str | None = None,
+              session_id: str | None = None,
+              phase: str | None = None) -> None:
+        """Record a test checkpoint (assertion result).
+
+        Args:
+            name: Short description of what was checked.
+            passed: Whether the check passed.
+            detail: Optional detail (e.g. actual vs expected).
+            session_id: Tie this check to a specific session.
+            phase: Tie this check to a named phase.
+        """
+        self._checks.append({
+            "name": name,
+            "passed": passed,
+            "detail": detail,
+            "session_id": session_id,
+            "phase": phase,
+        })
 
     def finalize(self) -> Path | None:
         if self._project_dir is None or self._test_file is None:
@@ -94,6 +144,10 @@ class ReportCollector:
                 session_metrics=self.session_metrics,
                 custom=self._custom,
                 sandbox_prefix=sandbox_prefix,
+                test_name=self._test_name,
+                test_description=self._test_description,
+                skill_under_test=self._skill_under_test,
+                checks=self._checks,
             )
             shutil.copy2(report_path, stable_html)
         else:
@@ -252,11 +306,23 @@ class ReportCollector:
 @pytest.fixture
 def report(request):
     collector = ReportCollector()
+    # Auto-extract test name, docstring, and skill from the pytest node
+    test_func = request.node.obj if hasattr(request.node, "obj") else None
+    if test_func is not None:
+        collector._test_name = request.node.name
+        doc = getattr(test_func, "__doc__", None)
+        if doc:
+            collector._test_description = doc.strip().split("\n")[0]
+    # Derive skill from test file path
+    test_path = Path(request.node.fspath) if hasattr(request.node, "fspath") else None
+    if test_path:
+        collector._skill_under_test = ReportCollector._derive_skill(test_path)
     request.node._report_collector = collector
     yield collector
     path = collector.finalize()
     if path:
-        print(f"\nReport: {path}")
+        skill = collector._skill_under_test or "?"
+        print(f"\n[{skill}] Report: {path}")
 
 
 @pytest.hookimpl(hookwrapper=True)

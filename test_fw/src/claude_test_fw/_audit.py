@@ -118,6 +118,10 @@ class AuditHelpers:
         session_metrics: dict[str, dict] | None = None,
         custom: dict[str, dict] | None = None,
         sandbox_prefix: str = "",
+        test_name: str | None = None,
+        test_description: str | None = None,
+        skill_under_test: str | None = None,
+        checks: list[dict] | None = None,
     ) -> Path:
         """Generate a self-contained HTML session report from audit data."""
         session_metrics = session_metrics or {}
@@ -200,6 +204,74 @@ class AuditHelpers:
                     f"w.classList.toggle('expanded')\">"
                     f'\u25B4</span></span></span>')
 
+        _tree_id_counter = [0]
+
+        def _json_to_tree(obj: object, *, collapse_after: int = 1, _depth: int = 0) -> str:
+            """Render a JSON-like object as a collapsible HTML tree."""
+            if isinstance(obj, dict) and not obj:
+                return '<span class="jt-null">{}</span>'
+            if isinstance(obj, list) and not obj:
+                return '<span class="jt-null">[]</span>'
+            if isinstance(obj, dict):
+                items: list[str] = []
+                for idx, (k, v) in enumerate(obj.items()):
+                    _tree_id_counter[0] += 1
+                    tid = _tree_id_counter[0]
+                    child_html = _json_to_tree(v, collapse_after=collapse_after, _depth=_depth + 1)
+                    if isinstance(v, (dict, list)) and v:
+                        preview = _tree_preview(v)
+                        collapsed = " jt-collapsed" if (_depth == 0 and idx >= collapse_after) else ""
+                        items.append(
+                            f'<li id="jt-{tid}" class="jt-branch{collapsed}">'
+                            f'<span class="jt-toggle" onclick="this.parentElement.classList.toggle(\'jt-collapsed\')">'
+                            f'<span class="jt-key">{h(str(k))}:</span>'
+                            f' <span class="jt-preview">{h(preview)}</span></span>'
+                            f'<ul>{child_html}</ul></li>'
+                        )
+                    else:
+                        items.append(f'<li><span class="jt-key">{h(str(k))}:</span> {child_html}</li>')
+                return "".join(items) if _depth > 0 else f'<div class="json-tree"><ul>{"".join(items)}</ul></div>'
+            if isinstance(obj, list):
+                items = []
+                for idx, v in enumerate(obj):
+                    _tree_id_counter[0] += 1
+                    tid = _tree_id_counter[0]
+                    child_html = _json_to_tree(v, collapse_after=collapse_after, _depth=_depth + 1)
+                    if isinstance(v, (dict, list)) and v:
+                        preview = _tree_preview(v)
+                        collapsed = " jt-collapsed" if (_depth == 0 and idx >= collapse_after) else ""
+                        items.append(
+                            f'<li id="jt-{tid}" class="jt-branch{collapsed}">'
+                            f'<span class="jt-toggle" onclick="this.parentElement.classList.toggle(\'jt-collapsed\')">'
+                            f'<span class="jt-key">[{idx}]</span>'
+                            f' <span class="jt-preview">{h(preview)}</span></span>'
+                            f'<ul>{child_html}</ul></li>'
+                        )
+                    else:
+                        items.append(f'<li><span class="jt-key">[{idx}]</span> {child_html}</li>')
+                return "".join(items) if _depth > 0 else f'<div class="json-tree"><ul>{"".join(items)}</ul></div>'
+            if isinstance(obj, str):
+                if len(obj) > 200:
+                    return f'<span class="jt-str">{_truncate(obj, 200)}</span>'
+                return f'<span class="jt-str">"{h(obj)}"</span>'
+            if isinstance(obj, bool):
+                return f'<span class="jt-bool">{h(str(obj).lower())}</span>'
+            if isinstance(obj, (int, float)):
+                return f'<span class="jt-num">{h(str(obj))}</span>'
+            if obj is None:
+                return '<span class="jt-null">null</span>'
+            return h(str(obj))
+
+        def _tree_preview(obj: object) -> str:
+            """Short preview string for collapsed tree nodes."""
+            if isinstance(obj, dict):
+                keys = list(obj.keys())[:3]
+                suffix = ", \u2026" if len(obj) > 3 else ""
+                return "{" + ", ".join(keys) + suffix + "}"
+            if isinstance(obj, list):
+                return f"[{len(obj)} items]"
+            return str(obj)[:40]
+
         _EVENT_COLORS = {
             "user_prompt": "#2563eb",
             "tool_call": "#16a34a",
@@ -220,11 +292,14 @@ class AuditHelpers:
             c = ev.get("content", {})
             if t == "tool_call":
                 tool = c.get("tool", "?")
-                inp = json.dumps(c.get("input", ""), ensure_ascii=False)
-                return f"tool_call: {h(tool)}  {_truncate(inp)}"
+                inp = c.get("input", "")
+                tree_html = _json_to_tree(inp, collapse_after=1) if isinstance(inp, (dict, list)) and inp else _truncate(json.dumps(inp, ensure_ascii=False))
+                return f"<strong>{h(tool)}</strong> {tree_html}"
             if t == "tool_result":
-                status = "ERROR" if c.get("is_error") else "ok"
-                return f"tool_result: [{status}]"
+                is_err = c.get("is_error")
+                if is_err:
+                    return '<span class="pass-fail pf-fail">FAIL</span>'
+                return '<span class="pass-fail pf-pass">PASS</span>'
             if t == "user_prompt":
                 prompt = c.get("prompt", c.get("message", ""))
                 if isinstance(prompt, str):
@@ -233,7 +308,9 @@ class AuditHelpers:
             if t == "agent_report":
                 event_name = c.get("event", "")
                 detail = c.get("detail", "")
-                return f"agent_report: {h(event_name)}  {_truncate(str(detail), 80)}"
+                if isinstance(detail, (dict, list)) and detail:
+                    return f"<strong>{h(event_name)}</strong> {_json_to_tree(detail, collapse_after=1)}"
+                return f"<strong>{h(event_name)}</strong>  {_truncate(str(detail), 80)}"
             if t == "plan_snapshot":
                 plan_file = c.get("plan_file", "")
                 if plan_file:
@@ -296,9 +373,49 @@ class AuditHelpers:
                    font-size: 13px; background: #f3f4f6; border: 1px solid #e5e7eb; }}
   .session-stat .stat-name {{ color: #6b7280; }}
   .session-stat .stat-val {{ font-weight: 600; color: #1f2937; }}
+  .test-header {{ background: #f0f4ff; border: 1px solid #c7d2fe; border-radius: 8px;
+                  padding: 16px 20px; margin: 16px 0; }}
+  .test-header .test-skill {{ font-size: 13px; color: #6b7280; text-transform: uppercase;
+                              letter-spacing: 0.05em; margin-bottom: 4px; }}
+  .test-header .test-skill code {{ color: #4338ca; font-size: 14px; text-transform: none;
+                                   letter-spacing: normal; }}
+  .test-header .test-desc {{ color: #374151; margin-top: 6px; font-size: 14px; }}
+  .json-tree {{ font-size: 12px; line-height: 1.4; }}
+  .json-tree ul {{ list-style: none; padding-left: 16px; margin: 0; }}
+  .json-tree > ul {{ padding-left: 0; }}
+  .json-tree li {{ margin: 1px 0; }}
+  .json-tree .jt-key {{ color: #7c3aed; font-weight: 600; }}
+  .json-tree .jt-str {{ color: #059669; }}
+  .json-tree .jt-num {{ color: #d97706; }}
+  .json-tree .jt-bool {{ color: #dc2626; }}
+  .json-tree .jt-null {{ color: #9ca3af; font-style: italic; }}
+  .json-tree .jt-toggle {{ cursor: pointer; user-select: none; color: #6b7280; }}
+  .json-tree .jt-toggle::before {{ content: "\\25BE "; }}
+  .json-tree .jt-collapsed > .jt-toggle::before {{ content: "\\25B8 "; }}
+  .json-tree .jt-collapsed > ul {{ display: none; }}
+  .json-tree .jt-collapsed > .jt-toggle .jt-preview {{ display: inline; }}
+  .json-tree .jt-preview {{ display: none; color: #9ca3af; font-style: italic; font-weight: normal; }}
+  .pass-fail {{ font-weight: 700; font-size: 13px; }}
+  .pf-pass {{ color: #16a34a; }}
+  .pf-fail {{ color: #dc2626; }}
+  .check-row td {{ font-size: 13px; }}
+  .check-icon {{ font-size: 16px; }}
+  .check-name {{ font-weight: 600; }}
+  .check-detail {{ color: #6b7280; font-size: 12px; }}
 </style></head><body>
 <h1>{h(title)}</h1>
-<p class="meta">Generated: {h(now)}{f'  |  Model: {h(model)}' if model else ''}
+""")
+        if skill_under_test or test_description:
+            parts.append('<div class="test-header">')
+            if skill_under_test:
+                parts.append(
+                    f'<div class="test-skill">Skill under test: '
+                    f'<code>.claude/skills/{h(skill_under_test)}</code></div>'
+                )
+            if test_description:
+                parts.append(f'<div class="test-desc">{h(test_description)}</div>')
+            parts.append('</div>')
+        parts.append(f"""<p class="meta">Generated: {h(now)}{f'  |  Model: {h(model)}' if model else ''}
    |  Sessions: {len(sessions)}</p>
 """)
 
@@ -416,9 +533,39 @@ class AuditHelpers:
 <td><span class="event-type" style="background:{color}">{h(etype)}</span></td>
 <td class="event-detail mono">{label}</td>
 </tr>""")
+                # Append session-bound checks as rows at the end of the event table
+                if checks:
+                    sid = s["session_id"]
+                    session_checks = [c for c in checks
+                                      if c.get("session_id") == sid]
+                    for ck in session_checks:
+                        icon = '<span class="pf-pass">PASS</span>' if ck["passed"] else '<span class="pf-fail">FAIL</span>'
+                        detail_html = f' <span class="check-detail">— {h(ck["detail"])}</span>' if ck.get("detail") else ""
+                        parts.append(
+                            f'<tr class="check-row"><td></td><td></td>'
+                            f'<td><span class="event-type" style="background:#8b5cf6">check</span></td>'
+                            f'<td>{icon} <span class="check-name">{h(ck["name"])}</span>{detail_html}</td></tr>'
+                        )
                 parts.append("</table>")
             else:
                 parts.append("<p class='meta'>No ops events recorded for this session.</p>")
+
+        # Render checks not tied to a specific session
+        if checks:
+            general_checks = [c for c in checks if not c.get("session_id")]
+            if general_checks:
+                parts.append('<h2>Test Checks</h2>')
+                parts.append('<table><tr><th style="width:50px"></th><th>Check</th><th>Detail</th></tr>')
+                for ck in general_checks:
+                    icon = '<span class="pf-pass">PASS</span>' if ck["passed"] else '<span class="pf-fail">FAIL</span>'
+                    phase_prefix = f'<span class="check-detail">[{h(ck["phase"])}]</span> ' if ck.get("phase") else ""
+                    detail_html = h(ck["detail"]) if ck.get("detail") else ""
+                    parts.append(
+                        f'<tr class="check-row"><td>{icon}</td>'
+                        f'<td>{phase_prefix}<span class="check-name">{h(ck["name"])}</span></td>'
+                        f'<td class="check-detail">{detail_html}</td></tr>'
+                    )
+                parts.append("</table>")
 
         parts.append("<h2>Project Files</h2>")
         if project_files:
