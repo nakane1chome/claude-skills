@@ -80,8 +80,9 @@ claude --plugin-dir /path/to/claude-skills/skills/dev-record
 
 See [AUTHORING.md](AUTHORING.md) for conventions on writing new skills — directory layout, frontmatter fields, the stop-after-each-stage pattern, and description best practices.
 
-## Links
+## Related
 
+- [claude-devtools](https://www.claude-dev.tools/) — free desktop app that visualizes Claude Code session logs from `~/.claude/`. Provides token attribution, tool call inspection, subagent trees, and notification triggers. Complementary to dev-record: claude-devtools gives you rich visual replay of *what happened*; dev-record captures *agent intent* (plans, deviations, scope creep) and produces committable audit artifacts that claude-devtools doesn't
 - [Awesome Claude Code](https://github.com/hesreallyhim/awesome-claude-code) — curated list of Claude Code skills, hooks, commands, and tools
 - [Claude Skill: Document Review Pipeline](https://www.shincbm.com/agentic-code/2026/02/15/claude-skill-document-review.html) — blog post on the design of these skills
 

@@ -55,6 +55,9 @@ Report the current state of dev-record in the project.
 | Session boundaries | `SessionEnd` | Session summary with raw counts |
 | Hook-detected anomalies | `PreToolUse` / `PostToolUse` | `stop_ignored`, `hallucinated_path`, `repeated_failure`, `regression_unlabelled` (see Limitations below) |
 | Plan-vs-actual file diff | `SessionEnd` | `unrecorded_deviation` — files in plan but not touched, or files touched but not in plan (see [Plan File Diff Detection](#plan-file-diff-detection)) |
+| Token usage | `SessionEnd` | Per-session input/output/cache token totals extracted from Claude Code session log |
+| Estimated cost | `SessionEnd` | Computed from token counts and model pricing (labeled `estimated_cost_usd`) |
+| Context compactions | `SessionEnd` | When the context window was compressed — trigger type and pre-compaction token count |
 
 **Secondary metrics** (derived from primary records — raw counts, not computed rates):
 
@@ -81,6 +84,10 @@ Report the current state of dev-record in the project.
 > **Limitation**: Self-reporting is least reliable for the exact situations it's designed to capture. An agent that declines difficult work may rationalize it as "out of scope" rather than flag it. Treat self-reported events as a lower bound, not a complete record. The developer should review sessions and append additional `agent_report` entries for events the agent missed.
 
 > **Hook detection limitations**: Hook-detected anomaly events (`stop_ignored`, `repeated_failure`, `regression_unlabelled`) use `tool_response.success = false` to indicate a failed tool call. In practice, `success = false` means the user *denied* the tool call, not that the command exited with a non-zero status. These detectors therefore identify repeated permission denials, not execution failures. Stop-word matching (`stop_ignored`) uses a fixed word list and will produce false positives for prompts that use these words in a non-imperative context (e.g. "don't worry, proceed").
+
+> **Session metrics limitations**: Token usage, cost, and compaction data are extracted from Claude Code's native session log (`~/.claude/projects/`). If the session log is not accessible (e.g. different user, remote execution), these fields will be `null` in the summary. The `estimated_cost_usd` uses a hardcoded pricing table and may not reflect current or discounted rates. Compaction events record `pre_tokens` but not the post-compaction count (Claude Code does not log it).
+
+> **Subagent tracking**: Hook payloads do not include agent or subagent identity. Tool calls from subagents appear as normal events, indistinguishable from main-agent calls. Subagent attribution would require Claude Code to add agent context to hook payloads.
 
 ### Plan File Diff Detection
 
@@ -126,11 +133,12 @@ Operational detail is equivalent to ephemeral communication (chat messages, verb
 {"timestamp": "ISO8601", "session_id": "str", "type": "plan_snapshot", "content": {"transcript_path": "..."}}
 {"timestamp": "ISO8601", "session_id": "str", "type": "agent_report", "content": {"event": "plan_stated", "detail": "..."}}
 {"timestamp": "ISO8601", "session_id": "str", "type": "agent_report", "content": {"event": "plan_deviation", "detail": "..."}}
+{"timestamp": "ISO8601", "session_id": "str", "type": "compaction", "content": {"trigger": "auto", "pre_tokens": 167238}}
 ```
 
 **Session summary** (project artifact) — written at session end to `audit/dev_record/<timestamp>-<session-id>.json`.
 
-**Extracted events** (project artifact) — agent reports and plan snapshots extracted to `audit/dev_record/<timestamp>-<session-id>-events.jsonl`. Only created if the session contains agent reports or plan snapshots.
+**Extracted events** (project artifact) — agent reports, plan snapshots, and compaction events extracted to `audit/dev_record/<timestamp>-<session-id>-events.jsonl`. Only created if the session contains any of these event types.
 
 ```json
 {
@@ -142,7 +150,19 @@ Operational detail is equivalent to ephemeral communication (chat messages, verb
   "corrections": 0,
   "user_prompts": 0,
   "agent_reports": [],
-  "plan_snapshots": 0
+  "plan_snapshots": 0,
+  "model": "claude-opus-4-6",
+  "token_usage": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0
+  },
+  "estimated_cost_usd": 0.0,
+  "compactions": {
+    "count": 0,
+    "events": [{"timestamp": "ISO8601", "trigger": "auto", "pre_tokens": 0}]
+  }
 }
 ```
 
@@ -190,7 +210,8 @@ Scripts live in `hooks/` within this plugin directory. When loaded via `--plugin
 | `record-prompt.sh` | `UserPromptSubmit` | Log human input |
 | `record-tool-call.sh` | `PreToolUse` | Log agent tool decisions |
 | `record-tool-result.sh` | `PostToolUse` | Log outcomes, detect plan exits |
-| `finalize-session.sh` | `SessionEnd` | Extract project artifacts from ops_record to dev_record; plan-vs-actual file diff detection |
+| `finalize-session.sh` | `SessionEnd` | Extract project artifacts from ops_record to dev_record; plan-vs-actual file diff; session metrics extraction |
+| `extract-session-metrics.sh` | (called by finalize) | Read Claude session log for token usage, cost estimate, compaction events |
 
 All scripts require `jq`. Each script exits 0 (non-blocking) and appends to JSONL, so concurrent sessions write to separate files without conflict.
 
@@ -201,5 +222,7 @@ Hook paths are resolved at install time and written as absolute paths in `.claud
 | Goal | Use |
 |------|-----|
 | Record raw session data (plans, input, decisions) | **dev-record** |
+| Track token usage and estimated cost per session | **dev-record** (extracted from Claude session logs) |
+| Visual session replay with token attribution | [claude-devtools](https://www.claude-dev.tools/) (complementary — reads `~/.claude/` logs directly) |
 | Analyze trends and measure agent improvement | A project-specific retrospective skill consuming dev-record data |
 | Review a document for quality | **review-steps**, **strong-edit** |

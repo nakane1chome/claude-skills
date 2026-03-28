@@ -201,3 +201,38 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
             f"Agent reports found: {[e.get('content', {}).get('event') for e in agent_reports]}",
             stacklevel=1,
         )
+
+    # ---- Session metrics (token usage, cost, compactions) ----
+    # These are extracted from Claude's native session log at ~/.claude/projects/.
+    # Soft assertions only — the session log may not be accessible in all environments.
+    impl_summary = audit.read_summary(project_dir, impl_session_id)
+    has_tokens = impl_summary.get("token_usage") is not None
+    report.check("token_usage present", has_tokens,
+                 session_id=impl_session_id, phase="Metrics")
+    if has_tokens:
+        report.check("input_tokens > 0",
+                     impl_summary["token_usage"].get("input_tokens", 0) > 0,
+                     session_id=impl_session_id, phase="Metrics",
+                     detail=f'{impl_summary["token_usage"].get("input_tokens", 0):,}')
+        report.check("output_tokens > 0",
+                     impl_summary["token_usage"].get("output_tokens", 0) > 0,
+                     session_id=impl_session_id, phase="Metrics",
+                     detail=f'{impl_summary["token_usage"].get("output_tokens", 0):,}')
+    report.check("model present", impl_summary.get("model") is not None,
+                 session_id=impl_session_id, phase="Metrics",
+                 detail=impl_summary.get("model", "?"))
+    report.check("estimated_cost_usd present",
+                 impl_summary.get("estimated_cost_usd") is not None,
+                 session_id=impl_session_id, phase="Metrics",
+                 detail=f'${impl_summary.get("estimated_cost_usd") or 0:.4f}')
+    report.check("compactions field present",
+                 impl_summary.get("compactions") is not None,
+                 session_id=impl_session_id, phase="Metrics")
+
+    if not has_tokens:
+        import warnings
+        warnings.warn(
+            "token_usage not found in session summary — "
+            "Claude session log may not be accessible in this environment",
+            stacklevel=1,
+        )

@@ -47,6 +47,19 @@ CORRECTIONS=$(jq -s '
 STARTED=$(jq -s '.[0].timestamp // empty' "$LOG_FILE")
 
 # ---------------------------------------------------------------------------
+# Extract session metrics (tokens, cost, compactions) from Claude session log
+# ---------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+METRICS=$(bash "$SCRIPT_DIR/extract-session-metrics.sh" "$SESSION_ID" "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || echo '{}')
+
+# Append compaction events to ops_record JSONL
+echo "$METRICS" | jq -c --arg sid "$SESSION_ID" '
+  .compactions.events[]? |
+  {timestamp: .timestamp, session_id: $sid, type: "compaction",
+   content: {trigger: .trigger, pre_tokens: .pre_tokens}}
+' >> "$LOG_FILE" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
 # Plan-vs-actual file diff detection
 # ---------------------------------------------------------------------------
 # If a plan snapshot exists for this session, compare the plan's file list
@@ -134,6 +147,7 @@ jq -n \
   --argjson prompts "$USER_PROMPTS" \
   --argjson reports "$AGENT_REPORTS" \
   --argjson snapshots "$PLAN_SNAPSHOTS" \
+  --argjson metrics "$METRICS" \
   '{
     session_id: $sid,
     started: $started,
@@ -143,14 +157,18 @@ jq -n \
     corrections: $corrections,
     user_prompts: $prompts,
     agent_reports: $reports,
-    plan_snapshots: $snapshots
+    plan_snapshots: $snapshots,
+    model: ($metrics.model // null),
+    token_usage: ($metrics.token_usage // null),
+    estimated_cost_usd: ($metrics.estimated_cost_usd // null),
+    compactions: ($metrics.compactions // {count: 0, events: []})
   }' > "$SUMMARY_FILE"
 
-# Extract agent_report and plan_snapshot events to dev_record (project artifacts)
-jq -c 'select(.type == "agent_report" or .type == "plan_snapshot")' "$LOG_FILE" \
+# Extract agent_report, plan_snapshot, and compaction events to dev_record (project artifacts)
+jq -c 'select(.type == "agent_report" or .type == "plan_snapshot" or .type == "compaction")' "$LOG_FILE" \
   > "$DEV_DIR/${BASENAME}-events.jsonl" 2>/dev/null || true
 
-# Remove empty events file if no agent reports or plan snapshots existed
+# Remove empty events file if no agent reports, plan snapshots, or compactions existed
 if [ ! -s "$DEV_DIR/${BASENAME}-events.jsonl" ]; then
   rm -f "$DEV_DIR/${BASENAME}-events.jsonl"
 fi
