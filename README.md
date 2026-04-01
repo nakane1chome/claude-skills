@@ -23,6 +23,12 @@ Skills for authoring, reviewing, and optimizing documents. They use a **stop-aft
 
 Skills are composable: **flesh-out** a skeleton, then **review-steps** the result, then **strong-edit** the final draft.
 
+## Code Generation
+
+| Skill | Use When |
+|-------|----------|
+| [generator-coding](skills/generator-coding/) | Building template-based code generators — data model + templates + helpers producing repetitive interface code (register maps, serialization, schema-driven output) |
+
 ## Traceability
 
 Components for recording and auditing agent activity across sessions.

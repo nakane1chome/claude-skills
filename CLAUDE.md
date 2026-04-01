@@ -27,6 +27,12 @@ Each component lives in `skills/<name>/` and contains:
 | **agent-optimize** | Optimize docs for AI agent consumption | Verbose prose that agents will need to parse |
 | **sdlc-cross-review** | Completeness + parent document consistency via V-model | Document that needs checking against its SDLC hierarchy |
 
+## Code Generation
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| **generator-coding** | Template-based code generation pattern | Building generators that use data models + templates + helpers to produce repetitive interface code |
+
 ## Traceability
 
 | Component | Type | Purpose |
