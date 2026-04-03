@@ -34,6 +34,7 @@ test: ## Run skill tests for all model tiers (override with MODELS="weakest mid"
 			$(CURDIR)/$(SITE_DIR)/runs/local/$$tier/ 2>/dev/null || true; \
 	done; \
 	python $(CURDIR)/.github/scripts/generate-pages-index.py $(CURDIR)/$(SITE_DIR); \
+	python $(CURDIR)/.github/scripts/update-readme-results.py $(CURDIR)/$(SITE_DIR) $(CURDIR)/README.md; \
 	exit $$fail
 
 test-weak: ## Run skill tests for weakest model tier only

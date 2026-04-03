@@ -88,6 +88,18 @@ Every test reports two scores:
 
 See [`docs/testing.md`](docs/testing.md) for the full guide on choosing check classes and difficulty tiers.
 
+### Latest results
+
+<!-- BEGIN TEST RESULTS -->
+| Test | Haiku | Ability | Sonnet | Ability | Opus | Ability |
+|------|:---: | :---: | :---: | :---: | :---: | :---:|
+| dev-record/full_workflow | PASS | 31.6% | PASS | 31.6% | PASS | 31.6% |
+| generator-coding/library_generator-baseline | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| generator-coding/library_generator-with_skill | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| review-skill/review_finds_seeded_issues | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| review-steps/review_preserves_vocabulary | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+<!-- END TEST RESULTS -->
+
 ## Installation
 
 ```bash
