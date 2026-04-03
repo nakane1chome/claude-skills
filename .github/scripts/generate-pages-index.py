@@ -316,14 +316,14 @@ def generate_index(site_dir: Path) -> None:
                         scores_str = ""
                         if scores and scores.get("hard_total", 0) > 0:
                             hp = scores.get("hard_pass", True)
-                            label = "PASS" if hp else "FAIL"
+                            hard_label = "PASS" if hp else "FAIL"
                             color = "#16a34a" if hp else "#dc2626"
                             pct = scores.get("achievement_pct")
                             pct_str = (f', <span style="color:#2563eb;font-weight:700">'
                                        f'ABILITY: {pct}%</span>') if pct is not None else ""
                             scores_str = (
                                 f'<span style="color:{color};font-weight:700">'
-                                f'{label}</span>{pct_str}; '
+                                f'{hard_label}</span>{pct_str}; '
                             )
                         metrics_str = ""
                         if totals:
