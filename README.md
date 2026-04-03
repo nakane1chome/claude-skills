@@ -13,15 +13,20 @@ Together they give you a controlled development loop: skills enforce *how* the a
 
 Skills for authoring, reviewing, and optimizing documents. They use a **stop-after-each-stage** pattern — the agent pauses for developer review between stages.
 
+These three skills form a [composable document review pipeline](https://www.shincbm.com/agentic-code/2026/02/15/claude-skill-document-review.html): **flesh-out** a skeleton, then **review-steps** the result, then **strong-edit** the final draft.
+
 | Skill | Use When |
 |-------|----------|
 | [flesh-out](skills/flesh-out/) | Raw notes, bullet points, or stream of consciousness that needs generative expansion into structured content |
 | [review-steps](skills/review-steps/) | A draft with typos, incomplete sentences, or needing a final polish pass for language, clarity, and structure |
 | [strong-edit](skills/strong-edit/) | A complete draft that needs substantive critique — challenges structure, argument, relevance, and readability |
+
+The following skills are less developed:
+
+| Skill | Use When |
+|-------|----------|
 | [agent-optimize](skills/agent-optimize/) | Verbose prose that AI agents will need to parse — restructures for efficient machine consumption |
 | [sdlc-cross-review](skills/sdlc-cross-review/) | A document that should align with its parent spec — completeness and consistency checking via V-model cross-validation |
-
-Skills are composable: **flesh-out** a skeleton, then **review-steps** the result, then **strong-edit** the final draft.
 
 ## Code Generation
 
