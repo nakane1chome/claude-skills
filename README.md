@@ -64,7 +64,24 @@ The framework lives in [`test_fw/`](test_fw/) as an installable Python package a
 - **Ablation detection** — semantic analysis (TF-IDF embeddings, concept matching) to verify agents preserve meaning while transforming documents
 - **Multi-format reporting** — per-model JSON, Markdown, and HTML reports aggregated to `site/`
 
-CI runs via [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml) with results published to GitHub Pages.
+CI runs via [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml). Regression results are published to [shincbm.com/claude-skills](https://www.shincbm.com/claude-skills/).
+
+### Check classes
+
+Skill testing is more like characterization than traditional software testing — some outcomes are objectively verifiable, others depend on model capability. Tests use three check classes to distinguish between hard requirements and quality indicators:
+
+| Class | On failure | Terminology | Use when |
+|-------|-----------|-------------|----------|
+| **require** | Aborts test | PASS / FAIL | Infrastructure prerequisites — session completed, no errors. The test cannot continue without this. |
+| **expect** | Records failure, test continues | PASS / FAIL | Prompted deliverables — the prompt explicitly asked the model to produce this (e.g. "create library.py"). Not producing it is a failure. |
+| **achieve** | Records result, test continues | ACHIEVED / NOT ACHIEVED | Quality indicators — how well the model followed the skill's guidance. Weighted by difficulty and rolled up to an ability percentage. |
+
+Every test reports two scores:
+
+- **Hard: PASS/FAIL** — all require + expect checks must pass
+- **Ability: X%** — weighted percentage of achieve checks, where difficulty tiers (`expected` 1.0, `challenging` 0.5, `aspirational` 0.25) reflect model-tier expectations
+
+See [`docs/testing.md`](docs/testing.md) for the full guide on choosing check classes and difficulty tiers.
 
 ## Installation
 
