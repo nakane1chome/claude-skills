@@ -365,6 +365,10 @@ def generate_index(site_dir: Path) -> None:
 
     index_path = site_dir / "index.html"
     index_path.write_text("\n".join(parts))
+
+    # Ensure .nojekyll exists so GitHub Pages serves dotfile directories
+    (site_dir / ".nojekyll").touch(exist_ok=True)
+
     print(f"Generated {index_path} ({len(runs)} runs)")
 
 

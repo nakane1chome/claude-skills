@@ -644,6 +644,8 @@ class AuditHelpers:
 
             from urllib.parse import quote as _urlquote
 
+            _COLLAPSED_DIRS = {".claude", "audit"}
+
             def _render_tree(node: dict) -> str:
                 items = []
                 entries = sorted(node.keys(), key=lambda k: (isinstance(node[k], str), k))
@@ -656,8 +658,9 @@ class AuditHelpers:
                             f'{h(name)}</a></li>'
                         )
                     else:
+                        collapsed = " collapsed" if name in _COLLAPSED_DIRS else ""
                         items.append(
-                            f'<li><span class="dir mono">{h(name)}/</span>'
+                            f'<li><span class="dir mono{collapsed}">{h(name)}/</span>'
                             f'<ul>{_render_tree(child)}</ul></li>'
                         )
                 return "".join(items)
