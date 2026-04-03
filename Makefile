@@ -27,6 +27,9 @@ test: ## Run skill tests for all model tiers (override with MODELS="weakest mid"
 		mkdir -p $(CURDIR)/$(SITE_DIR)/runs/local/$$tier; \
 		cp reports/*-$$tier.html reports/*-$$tier.json \
 			$(CURDIR)/$(SITE_DIR)/runs/local/$$tier/ 2>/dev/null || true; \
+		if [ -d reports/sandbox ]; then \
+			cp -r reports/sandbox $(CURDIR)/$(SITE_DIR)/runs/local/$$tier/ 2>/dev/null || true; \
+		fi; \
 		cp reports/pytest-$$tier.html \
 			$(CURDIR)/$(SITE_DIR)/runs/local/$$tier/ 2>/dev/null || true; \
 	done; \

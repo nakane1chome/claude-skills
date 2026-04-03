@@ -27,6 +27,12 @@ Each component lives in `skills/<name>/` and contains:
 | **agent-optimize** | Optimize docs for AI agent consumption | Verbose prose that agents will need to parse |
 | **sdlc-cross-review** | Completeness + parent document consistency via V-model | Document that needs checking against its SDLC hierarchy |
 
+## Code Generation
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| **generator-coding** | Template-based code generation pattern | Building generators that use data models + templates + helpers to produce repetitive interface code |
+
 ## Traceability
 
 | Component | Type | Purpose |
@@ -38,10 +44,27 @@ Each component lives in `skills/<name>/` and contains:
 
 E2E tests validate skills and plugins against real Claude sessions across model tiers.
 
-- `test_fw/` — reusable pytest framework (Claude SDK integration, audit inspection, ablation detection)
+- `test_fw/` — reusable pytest framework (Claude SDK integration, audit inspection, ablation detection, test steps)
 - `tests/` — per-skill E2E tests that depend on `test_fw`
 - `make test` runs skill tests across model tiers; `make test-fw` runs framework unit tests; `make test-all` runs both
 - CI: `.github/workflows/e2e-tests.yml` publishes HTML reports to GitHub Pages
+- See `docs/testing.md` for the full test framework guide
+
+### Test Steps
+
+Tests use the `steps` fixture (`TestSteps` class) with three check classes:
+
+| Class | Prefix | On failure | Use when |
+|-------|--------|-----------|----------|
+| **require** | `steps.require_` | Aborts test | Infrastructure prerequisites (session health, no errors) |
+| **expect** | `steps.expect_` | Records FAIL, continues | Prompted deliverables the model was asked to produce |
+| **achieve** | `steps.achieve_` | Records NOT ACHIEVED, continues | Quality/approach indicators, weighted by difficulty |
+
+Every test reports two scores: **Hard: PASS/FAIL** (require + expect) and **Ability: X%** (weighted achieve checks). Difficulty tiers: `expected` (1.0), `challenging` (0.5), `aspirational` (0.25).
+
+## Test Failures
+
+**Every test failure is a real bug. Fix it.** There is no such thing as a "pre-existing failure," a "known flaky test," or an "unrelated issue." If a test fails, it is broken and you must fix it before moving on. Do not dismiss, skip, or rationalize away any failure. Do not label failures as "pre-existing" to avoid responsibility. If you broke it, fix it. If it was already broken, fix it anyway — you are looking at it now and that makes it your problem.
 
 ## Conventions
 

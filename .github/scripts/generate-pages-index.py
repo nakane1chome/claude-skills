@@ -39,22 +39,44 @@ def _load_all_metrics(model_dir: Path) -> list[dict]:
     return results
 
 
+def _label_from_json(model_dir: Path, stem: str) -> str | None:
+    """Try to read a structured label from the companion JSON metrics file."""
+    json_path = model_dir / f"{stem}.json"
+    if not json_path.is_file():
+        return None
+    try:
+        data = json.loads(json_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    skill = data.get("skill")
+    test_name = data.get("test_name")
+    if skill and test_name:
+        # Strip test_ prefix and parametrize brackets for display
+        clean = test_name.removeprefix("test_").replace("[", "-").replace("]", "")
+        return f"{skill}/{clean}"
+    return None
+
+
+def _label_from_filename(stem: str) -> str:
+    """Derive label by parsing the report filename (legacy fallback)."""
+    remainder = stem.removeprefix("skills-")
+    parts = remainder.rsplit("-", 1)
+    if len(parts) == 2:
+        skill_parts = parts[0].rsplit("-", 1)
+        return "/".join(skill_parts) if len(skill_parts) == 2 else parts[0]
+    return remainder
+
+
 def _find_reports(model_dir: Path) -> list[dict]:
     """Find all non-pytest HTML reports with derived labels.
 
-    Label derivation: skills-dev-record-full_workflow-weakest -> dev-record/full_workflow
-    Strip 'skills-' prefix and '-{model_alias}' suffix, join remainder with '/'.
+    Reads label from companion JSON metadata when available,
+    falls back to filename parsing for backward compatibility.
     """
     reports = []
     for f in sorted(model_dir.glob("skills-*.html")):
         stem = f.stem
-        remainder = stem.removeprefix("skills-")
-        parts = remainder.rsplit("-", 1)
-        if len(parts) == 2:
-            skill_parts = parts[0].rsplit("-", 1)
-            label = "/".join(skill_parts) if len(skill_parts) == 2 else parts[0]
-        else:
-            label = remainder
+        label = _label_from_json(model_dir, stem) or _label_from_filename(stem)
         reports.append({"filename": f.name, "label": label})
     return reports
 
@@ -71,6 +93,14 @@ def _metrics_for_stem(all_metrics: list[dict], stem: str) -> dict | None:
     for entry in all_metrics:
         if entry["stem"] == stem:
             return entry["metrics"].get("totals", {})
+    return None
+
+
+def _scores_for_stem(all_metrics: list[dict], stem: str) -> dict | None:
+    """Find scores matching a specific report stem."""
+    for entry in all_metrics:
+        if entry["stem"] == stem:
+            return entry["metrics"].get("scores")
     return None
 
 
@@ -279,9 +309,22 @@ def generate_index(site_dir: Path) -> None:
                     if report:
                         base = f"runs/{run_id}/{model}"
                         href = f'{base}/{report["filename"]}'
-                        # Find per-test metrics
+                        # Find per-test metrics and scores
                         stem = report["filename"].removesuffix(".html")
                         totals = _metrics_for_stem(mdata["all_metrics"], stem)
+                        scores = _scores_for_stem(mdata["all_metrics"], stem)
+                        scores_str = ""
+                        if scores and scores.get("hard_total", 0) > 0:
+                            hp = scores.get("hard_pass", True)
+                            hard_label = "PASS" if hp else "FAIL"
+                            color = "#16a34a" if hp else "#dc2626"
+                            pct = scores.get("achievement_pct")
+                            pct_str = (f', <span style="color:#2563eb;font-weight:700">'
+                                       f'ABILITY: {pct}%</span>') if pct is not None else ""
+                            scores_str = (
+                                f'<span style="color:{color};font-weight:700">'
+                                f'{hard_label}</span>{pct_str}; '
+                            )
                         metrics_str = ""
                         if totals:
                             cost = f"${totals.get('cost_usd', 0):.4f}"
@@ -289,7 +332,7 @@ def generate_index(site_dir: Path) -> None:
                             turns = f"{totals.get('num_turns', 0)}t"
                             metrics_str = (
                                 f'<span class="metrics">'
-                                f'{cost} &middot; {dur} &middot; {turns}</span>'
+                                f'{scores_str}{cost} &middot; {dur} &middot; {turns}</span>'
                             )
                         parts.append(
                             f'<td class="cell-link">'

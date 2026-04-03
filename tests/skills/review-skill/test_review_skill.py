@@ -24,7 +24,7 @@ MAX_FOLLOW_UPS = 8
 
 
 async def test_review_finds_seeded_issues(
-    review_skill_project, sdk, model, model_alias, report, audit,
+    review_skill_project, steps, sdk, model, model_alias, report, audit,
 ):
     """Invoke review-skill on a flawed fixture and verify seeded issues are found."""
     project_dir, query_fn = review_skill_project
@@ -35,7 +35,6 @@ async def test_review_finds_seeded_issues(
     )
 
     # Multi-turn: send initial prompt, then respond with approvals
-    # when the skill pauses for developer review between stages
     async with query_fn.conversation(max_turns=25) as conv:
         await conv.say(REVIEW_PROMPT)
 
@@ -43,57 +42,42 @@ async def test_review_finds_seeded_issues(
             await conv.say(CONTINUE_PROMPT)
 
     all_messages = conv.messages
-    # With multi-turn, use the last ResultMessage (final session state)
     results = [m for m in all_messages if isinstance(m, ResultMessage)]
     result = results[-1] if results else None
-    assert result is not None, "No ResultMessage returned"
-    assert not result.is_error, (
-        f"Review session ended with error: {sdk.text(all_messages)[-500:]}"
-    )
+
+    # require_: session must complete
+    steps.require_session_ok(all_messages, phase="Review")
 
     session_id = result.session_id
-    report.check("no error", not result.is_error, session_id=session_id, phase="Review")
 
-    # ClaudeSDKClient may not trigger SessionEnd hook — finalize manually
+    # Finalize audit
     audit.finalize(project_dir, session_id)
 
     report.add(session_id, sdk.metrics(all_messages), phase="Review")
     sdk.log_phase("review-skill", all_messages, project_dir)
 
     text = sdk.text(all_messages).lower()
-    report.check("response length > 100", len(text) > 100,
-                 session_id=session_id, phase="Review",
-                 detail=f"{len(text)} chars")
-    assert len(text) > 100, (
-        f"Response too short ({len(text)} chars) — review likely did not run"
-    )
 
-    # Each seeded issue maps to keyword checks on the full response.
-    # We collect which issues were detected, then assert a minimum threshold.
-    issue_checks = {
-        "name-kebab": bool(re.search(r"kebab|camel.?case|naming", text)),
-        "description-vague": bool(re.search(r"vague|broad|generic|specific|trigger", text)),
-        "argument-hint-missing": bool(re.search(r"argument.?hint", text)),
-        "stop-after-stage": bool(re.search(r"stop.after|pause|stage.by.stage|between.stage|developer.review", text)),
-        "no-stage-0": bool(re.search(r"stage.?0|understand|confirm.before|read.and.understand", text)),
-        "unreferenced-file": bool(re.search(r"unreferenc|unused|not.referenc|orphan", text)),
+    # expect_: response should be substantial
+    steps.expect_text_length(text, 100, session_id=session_id, phase="Review")
+
+    # Seeded issue patterns
+    issue_patterns = {
+        "name-kebab": r"kebab|camel.?case|naming",
+        "description-vague": r"vague|broad|generic|specific|trigger",
+        "argument-hint-missing": r"argument.?hint",
+        "stop-after-stage": r"stop.after|pause|stage.by.stage|between.stage|developer.review",
+        "no-stage-0": r"stage.?0|understand|confirm.before|read.and.understand",
+        "unreferenced-file": r"unreferenc|unused|not.referenc|orphan",
     }
 
-    found = [name for name, detected in issue_checks.items() if detected]
-    missed = [name for name, detected in issue_checks.items() if not detected]
+    # achieve_: each individual issue is a quality indicator
+    found, missed = steps.achieve_seeded_issues(
+        text, issue_patterns, min_found=4,
+        difficulty="challenging", session_id=session_id, phase="Verification",
+    )
 
-    # Record each seeded issue as a check
-    for name, detected in issue_checks.items():
-        report.check(f"seeded issue: {name}", detected, phase="Verification")
-
-    report.check(f">= 4 of 6 seeded issues found", len(found) >= 4,
+    # expect_: prompt asked for thorough review — threshold must be met
+    steps.expect(f">= 4 of 6 seeded issues found", len(found) >= 4,
                  phase="Verification",
                  detail=f"found {len(found)}/6: {', '.join(found)}")
-
-    # Require at least 4 of 6 — allows for model variation across tiers
-    assert len(found) >= 4, (
-        f"Expected review-skill to catch >= 4 of 6 seeded issues, "
-        f"but only found {len(found)}: {found}. "
-        f"Missed: {missed}. "
-        f"Response length: {len(text)} chars"
-    )

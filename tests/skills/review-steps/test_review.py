@@ -56,7 +56,7 @@ def _run_ablation(input_text: str, output_text: str):
 
 
 async def test_review_preserves_vocabulary(
-    review_project, sdk, model, model_alias, report, audit,
+    review_project, steps, sdk, model, model_alias, report, audit,
 ):
     """Claude's review output should preserve domain-specific vocabulary."""
     project_dir, doc_path, query_fn = review_project
@@ -68,7 +68,6 @@ async def test_review_preserves_vocabulary(
     )
 
     # Multi-turn: send initial prompt, then respond with approvals
-    # when the skill pauses for developer review between stages
     async with query_fn.conversation(max_turns=15) as conv:
         await conv.say(REVIEW_PROMPT)
 
@@ -78,18 +77,15 @@ async def test_review_preserves_vocabulary(
             await conv.say(CONTINUE_PROMPT)
 
     all_messages = conv.messages
-    # With multi-turn, use the last ResultMessage (final session state)
     results = [m for m in all_messages if isinstance(m, ResultMessage)]
     result = results[-1] if results else None
-    assert result is not None, "No ResultMessage from review session"
-    assert not result.is_error, (
-        f"Review session ended with error: {sdk.text(all_messages)[-500:]}"
-    )
+
+    # require_: session must complete
+    steps.require_session_ok(all_messages, phase="Review")
 
     session_id = result.session_id
-    report.check("no error", not result.is_error, session_id=session_id, phase="Review")
 
-    # ClaudeSDKClient may not trigger SessionEnd hook — finalize manually
+    # Finalize audit
     audit.finalize(project_dir, session_id)
 
     report.add(session_id, sdk.metrics(all_messages), phase="Review")
@@ -97,9 +93,10 @@ async def test_review_preserves_vocabulary(
 
     # Read the modified document
     output_text = doc_path.read_text(encoding="utf-8")
-    report.check("document modified", output_text != input_text,
+
+    # expect_: prompt asked for review — document should be modified
+    steps.expect("document modified", output_text != input_text,
                  session_id=session_id, phase="Review")
-    assert output_text != input_text, "Document was not modified by review"
 
     # Run ablation analysis
     score = _run_ablation(input_text, output_text)
@@ -107,26 +104,24 @@ async def test_review_preserves_vocabulary(
     # Attach ablation metrics to the shared report
     report.add_custom("ablation", ablation_metrics(score, "preserve"))
 
-    # Preserve mode: review should fix language without replacing vocabulary.
-    # Thresholds are slightly relaxed vs the static fixture tests because
-    # Claude may restructure sentences more than the hand-crafted expected-good.
-    report.check("coverage >= 0.7", score.coverage >= 0.7,
-                 phase="Ablation", detail=f"{score.coverage:.3f}")
-    assert score.coverage >= 0.7, (
-        f"Coverage too low: {score.coverage:.3f} (expected >= 0.7). "
-        f"Review may have restructured too aggressively."
-    )
-    report.check("lexical overlap >= 0.4", score.mean_lexical_overlap >= 0.4,
-                 phase="Ablation", detail=f"{score.mean_lexical_overlap:.3f}")
-    assert score.mean_lexical_overlap >= 0.4, (
-        f"Lexical overlap too low: {score.mean_lexical_overlap:.3f} "
-        f"(expected >= 0.4). "
-        f"Review may have replaced domain-specific vocabulary."
-    )
-    report.check("ablation risk < 0.35", score.mean_ablation_risk < 0.35,
-                 phase="Ablation", detail=f"{score.mean_ablation_risk:.3f}")
-    assert score.mean_ablation_risk < 0.35, (
-        f"Ablation risk too high: {score.mean_ablation_risk:.3f} "
-        f"(expected < 0.35). "
-        f"Review output shows signs of vocabulary flattening."
-    )
+    # expect_: review should preserve vocabulary above thresholds
+    steps.expect("coverage >= 0.7", score.coverage >= 0.7,
+                 phase="Ablation",
+                 detail=f"{score.coverage:.3f}")
+    steps.expect("lexical overlap >= 0.4", score.mean_lexical_overlap >= 0.4,
+                 phase="Ablation",
+                 detail=f"{score.mean_lexical_overlap:.3f}")
+    steps.expect("ablation risk < 0.35", score.mean_ablation_risk < 0.35,
+                 phase="Ablation",
+                 detail=f"{score.mean_ablation_risk:.3f}")
+
+    # achieve_: higher-quality ablation thresholds
+    steps.achieve("coverage >= 0.85", score.coverage >= 0.85,
+                  difficulty="expected", phase="Ablation",
+                  detail=f"{score.coverage:.3f}")
+    steps.achieve("lexical overlap >= 0.6", score.mean_lexical_overlap >= 0.6,
+                  difficulty="challenging", phase="Ablation",
+                  detail=f"{score.mean_lexical_overlap:.3f}")
+    steps.achieve("ablation risk < 0.15", score.mean_ablation_risk < 0.15,
+                  difficulty="challenging", phase="Ablation",
+                  detail=f"{score.mean_ablation_risk:.3f}")

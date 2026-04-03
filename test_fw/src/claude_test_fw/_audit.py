@@ -287,6 +287,17 @@ class AuditHelpers:
                 return _EVENT_COLORS["tool_result_err"] if ev.get("content", {}).get("is_error") else _EVENT_COLORS["tool_result_ok"]
             return _EVENT_COLORS.get(t, "#374151")
 
+        def _check_icon(ck: dict) -> str:
+            kind = ck.get("kind", "require")
+            passed = ck.get("passed", False)
+            if kind == "achieve":
+                if passed:
+                    return '<span class="pf-achieve">ACHIEVED</span>'
+                return '<span class="pf-not-achieved">NOT ACHIEVED</span>'
+            if passed:
+                return '<span class="pf-pass">PASS</span>'
+            return '<span class="pf-fail">FAIL</span>'
+
         def _event_label(ev: dict) -> str:
             t = ev.get("type", "")
             c = ev.get("content", {})
@@ -402,6 +413,22 @@ class AuditHelpers:
   .check-icon {{ font-size: 16px; }}
   .check-name {{ font-weight: 600; }}
   .check-detail {{ color: #6b7280; font-size: 12px; }}
+  .scores-banner {{ padding: 16px 20px; border-radius: 8px; margin: 16px 0;
+                    display: flex; gap: 24px; align-items: center; }}
+  .scores-banner.pass {{ background: #f0fdf4; border: 1px solid #86efac; }}
+  .scores-banner.fail {{ background: #fef2f2; border: 1px solid #fca5a5; }}
+  .score-item {{ font-size: 18px; font-weight: 700; }}
+  .score-item.pass {{ color: #16a34a; }}
+  .score-item.fail {{ color: #dc2626; }}
+  .score-item.achieve {{ color: #2563eb; }}
+  .pf-achieve {{ color: #2563eb; }}
+  .pf-not-achieved {{ color: #9ca3af; }}
+  .check-kind {{ display: inline-block; padding: 1px 6px; border-radius: 3px;
+                 font-size: 11px; font-weight: 600; color: #fff; margin-right: 4px; }}
+  .kind-require {{ background: #6b7280; }}
+  .kind-expect {{ background: #d97706; }}
+  .kind-achieve {{ background: #7c3aed; }}
+  .difficulty {{ font-size: 11px; color: #9ca3af; margin-left: 4px; }}
 </style></head><body>
 <h1>{h(title)}</h1>
 """)
@@ -418,6 +445,33 @@ class AuditHelpers:
         parts.append(f"""<p class="meta">Generated: {h(now)}{f'  |  Model: {h(model)}' if model else ''}
    |  Sessions: {len(sessions)}</p>
 """)
+
+        # Scores banner (computed from checks)
+        if checks:
+            from claude_test_fw._report import ReportCollector
+            _weights = ReportCollector._DIFFICULTY_WEIGHTS
+            require_checks = [c for c in checks if c.get("kind") == "require"]
+            expect_checks = [c for c in checks if c.get("kind") == "expect"]
+            achieve_checks = [c for c in checks if c.get("kind") == "achieve"]
+            hard_total = len(require_checks) + len(expect_checks)
+            hard_passed = (sum(1 for c in require_checks if c["passed"])
+                           + sum(1 for c in expect_checks if c["passed"]))
+            hard_pass = hard_passed == hard_total
+            banner_class = "pass" if hard_pass else "fail"
+            hard_label = "PASS" if hard_pass else "FAIL"
+            pf_class = "pass" if hard_pass else "fail"
+            parts.append(f'<div class="scores-banner {banner_class}">')
+            parts.append(f'<span class="score-item {pf_class}">'
+                         f'Hard: {hard_label} ({hard_passed}/{hard_total})</span>')
+            if achieve_checks:
+                w_achieved = sum(_weights.get(c.get("difficulty"), 1.0)
+                                for c in achieve_checks if c["passed"])
+                w_total = sum(_weights.get(c.get("difficulty"), 1.0)
+                              for c in achieve_checks)
+                pct = round(100 * w_achieved / w_total, 1) if w_total else 100.0
+                parts.append(f'<span class="score-item achieve">'
+                             f'Achievement: {pct}%</span>')
+            parts.append('</div>')
 
         has_metrics = any(s["metrics"] for s in sessions)
         parts.append("<h2>Session Summary</h2>\n<table><tr>")
@@ -539,12 +593,16 @@ class AuditHelpers:
                     session_checks = [c for c in checks
                                       if c.get("session_id") == sid]
                     for ck in session_checks:
-                        icon = '<span class="pf-pass">PASS</span>' if ck["passed"] else '<span class="pf-fail">FAIL</span>'
+                        icon = _check_icon(ck)
+                        kind = ck.get("kind", "require")
+                        kind_badge = f'<span class="check-kind kind-{kind}">{kind}</span>'
+                        diff = ck.get("difficulty")
+                        diff_html = f' <span class="difficulty">[{h(diff)}]</span>' if diff else ""
                         detail_html = f' <span class="check-detail">— {h(ck["detail"])}</span>' if ck.get("detail") else ""
                         parts.append(
                             f'<tr class="check-row"><td></td><td></td>'
-                            f'<td><span class="event-type" style="background:#8b5cf6">check</span></td>'
-                            f'<td>{icon} <span class="check-name">{h(ck["name"])}</span>{detail_html}</td></tr>'
+                            f'<td>{kind_badge}</td>'
+                            f'<td>{icon} <span class="check-name">{h(ck["name"])}</span>{diff_html}{detail_html}</td></tr>'
                         )
                 parts.append("</table>")
             else:
@@ -555,13 +613,19 @@ class AuditHelpers:
             general_checks = [c for c in checks if not c.get("session_id")]
             if general_checks:
                 parts.append('<h2>Test Checks</h2>')
-                parts.append('<table><tr><th style="width:50px"></th><th>Check</th><th>Detail</th></tr>')
+                parts.append('<table><tr><th style="width:50px"></th>'
+                             '<th>Kind</th><th>Check</th><th>Detail</th></tr>')
                 for ck in general_checks:
-                    icon = '<span class="pf-pass">PASS</span>' if ck["passed"] else '<span class="pf-fail">FAIL</span>'
+                    icon = _check_icon(ck)
+                    kind = ck.get("kind", "require")
+                    kind_badge = f'<span class="check-kind kind-{kind}">{kind}</span>'
+                    diff = ck.get("difficulty")
+                    diff_html = f' <span class="difficulty">[{h(diff)}]</span>' if diff else ""
                     phase_prefix = f'<span class="check-detail">[{h(ck["phase"])}]</span> ' if ck.get("phase") else ""
                     detail_html = h(ck["detail"]) if ck.get("detail") else ""
                     parts.append(
                         f'<tr class="check-row"><td>{icon}</td>'
+                        f'<td>{kind_badge}{diff_html}</td>'
                         f'<td>{phase_prefix}<span class="check-name">{h(ck["name"])}</span></td>'
                         f'<td class="check-detail">{detail_html}</td></tr>'
                     )
@@ -578,17 +642,18 @@ class AuditHelpers:
                     node = node.setdefault(part, {})
                 node[file_path.name] = f
 
+            from urllib.parse import quote as _urlquote
+
             def _render_tree(node: dict) -> str:
                 items = []
                 entries = sorted(node.keys(), key=lambda k: (isinstance(node[k], str), k))
                 for name in entries:
                     child = node[name]
                     if isinstance(child, str):
-                        display = name.replace(":", "-")
-                        href = sandbox_prefix + child.replace(":", "-")
+                        href = sandbox_prefix + _urlquote(child, safe="/-_.~")
                         items.append(
                             f'<li><a class="file mono" href="{h(href)}">'
-                            f'{h(display)}</a></li>'
+                            f'{h(name)}</a></li>'
                         )
                     else:
                         items.append(
