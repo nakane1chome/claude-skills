@@ -5,8 +5,8 @@
 set -euo pipefail
 
 INPUT=$(cat)
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
-PROMPT=$(echo "$INPUT" | jq -r '.prompt')
+SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id')
+PROMPT=$(printf '%s' "$INPUT" | jq -r '.prompt')
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LOG_DIR="${CLAUDE_PROJECT_DIR:-.}/audit/ops_record"
@@ -19,18 +19,25 @@ if [ -z "$LOG_FILE" ]; then
   LOG_FILE="$LOG_DIR/${FILE_TS}-${SESSION_ID}.jsonl"
 fi
 
+# Atomic append: temp file + flock to prevent interleaving with concurrent hooks
+LOCK_FILE="$LOG_DIR/.lock_${SESSION_ID}"
+TMP_FILE=$(mktemp "$LOG_DIR/.tmp.XXXXXX")
+trap 'rm -f "$TMP_FILE"' EXIT
+
 jq -cn --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" --arg p "$PROMPT" \
   '{timestamp: $ts, session_id: $sid, type: "user_prompt", content: {prompt: $p}}' \
-  >> "$LOG_FILE"
+  > "$TMP_FILE"
+
+flock "$LOCK_FILE" cat "$TMP_FILE" >> "$LOG_FILE"
 
 # Stop-word detection: set flag if prompt contains a stop-word so the next
 # tool call hook can detect if the agent proceeded despite the user saying stop.
 STOP_WORDS=("wait" "stop" "pause" "hold on" "don't" "dont" "no," "no." "cancel")
-PROMPT_LOWER=$(echo "$PROMPT" | tr '[:upper:]' '[:lower:]')
+PROMPT_LOWER=$(printf '%s' "$PROMPT" | tr '[:upper:]' '[:lower:]')
 FLAG_FILE="$LOG_DIR/.stop_flag_${SESSION_ID}"
 rm -f "$FLAG_FILE"                          # always clear prior flag
 for word in "${STOP_WORDS[@]}"; do
-  if echo "$PROMPT_LOWER" | grep -qF "$word"; then
+  if printf '%s' "$PROMPT_LOWER" | grep -qF "$word"; then
     touch "$FLAG_FILE"; break
   fi
 done

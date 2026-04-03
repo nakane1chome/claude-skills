@@ -39,22 +39,44 @@ def _load_all_metrics(model_dir: Path) -> list[dict]:
     return results
 
 
+def _label_from_json(model_dir: Path, stem: str) -> str | None:
+    """Try to read a structured label from the companion JSON metrics file."""
+    json_path = model_dir / f"{stem}.json"
+    if not json_path.is_file():
+        return None
+    try:
+        data = json.loads(json_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    skill = data.get("skill")
+    test_name = data.get("test_name")
+    if skill and test_name:
+        # Strip test_ prefix and parametrize brackets for display
+        clean = test_name.removeprefix("test_").replace("[", "-").replace("]", "")
+        return f"{skill}/{clean}"
+    return None
+
+
+def _label_from_filename(stem: str) -> str:
+    """Derive label by parsing the report filename (legacy fallback)."""
+    remainder = stem.removeprefix("skills-")
+    parts = remainder.rsplit("-", 1)
+    if len(parts) == 2:
+        skill_parts = parts[0].rsplit("-", 1)
+        return "/".join(skill_parts) if len(skill_parts) == 2 else parts[0]
+    return remainder
+
+
 def _find_reports(model_dir: Path) -> list[dict]:
     """Find all non-pytest HTML reports with derived labels.
 
-    Label derivation: skills-dev-record-full_workflow-weakest -> dev-record/full_workflow
-    Strip 'skills-' prefix and '-{model_alias}' suffix, join remainder with '/'.
+    Reads label from companion JSON metadata when available,
+    falls back to filename parsing for backward compatibility.
     """
     reports = []
     for f in sorted(model_dir.glob("skills-*.html")):
         stem = f.stem
-        remainder = stem.removeprefix("skills-")
-        parts = remainder.rsplit("-", 1)
-        if len(parts) == 2:
-            skill_parts = parts[0].rsplit("-", 1)
-            label = "/".join(skill_parts) if len(skill_parts) == 2 else parts[0]
-        else:
-            label = remainder
+        label = _label_from_json(model_dir, stem) or _label_from_filename(stem)
         reports.append({"filename": f.name, "label": label})
     return reports
 

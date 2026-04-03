@@ -31,7 +31,7 @@ TOOL_ATTEMPTS=$(jq -s '[.[] | select(.type == "tool_call")] | length' "$LOG_FILE
 TOOL_REJECTIONS=$(jq -s '[.[] | select(.type == "tool_result" and .content.success == false)] | length' "$LOG_FILE")
 USER_PROMPTS=$(jq -s '[.[] | select(.type == "user_prompt")] | length' "$LOG_FILE")
 PLAN_SNAPSHOTS=$(jq -s '[.[] | select(.type == "plan_snapshot")] | length' "$LOG_FILE")
-AGENT_REPORTS=$(jq -s '[.[] | select(.type == "agent_report") | .content]' "$LOG_FILE")
+AGENT_REPORTS=$(jq -sc '[.[] | select(.type == "agent_report") | .content]' "$LOG_FILE")
 
 # Estimate corrections: count user_prompt events that appear after a tool_result
 # with success=false. This is an approximation — a prompt following a rejection
@@ -134,20 +134,18 @@ if [ -n "$PLAN_FILE" ] && [ -f "$PLAN_FILE" ]; then
 fi
 
 # Re-read agent reports after plan-diff events may have been appended
-AGENT_REPORTS=$(jq -s '[.[] | select(.type == "agent_report") | .content]' "$LOG_FILE")
+AGENT_REPORTS=$(jq -sc '[.[] | select(.type == "agent_report") | .content]' "$LOG_FILE")
 
 # Write session summary to dev_record (project artifact)
-jq -n \
-  --arg sid "$SESSION_ID" \
+# Build base summary, then merge large values via stdin to avoid ARG_MAX limits.
+BASE=$(jq -nc --arg sid "$SESSION_ID" \
   --argjson started "${STARTED:-\"$TIMESTAMP\"}" \
   --arg ended "$TIMESTAMP" \
   --argjson attempts "$TOOL_ATTEMPTS" \
   --argjson rejections "$TOOL_REJECTIONS" \
   --argjson corrections "$CORRECTIONS" \
   --argjson prompts "$USER_PROMPTS" \
-  --argjson reports "$AGENT_REPORTS" \
   --argjson snapshots "$PLAN_SNAPSHOTS" \
-  --argjson metrics "$METRICS" \
   '{
     session_id: $sid,
     started: $started,
@@ -156,12 +154,16 @@ jq -n \
     tool_rejections: $rejections,
     corrections: $corrections,
     user_prompts: $prompts,
-    agent_reports: $reports,
-    plan_snapshots: $snapshots,
-    model: ($metrics.model // null),
-    token_usage: ($metrics.token_usage // null),
-    estimated_cost_usd: ($metrics.estimated_cost_usd // null),
-    compactions: ($metrics.compactions // {count: 0, events: []})
+    plan_snapshots: $snapshots
+  }')
+
+echo "$AGENT_REPORTS" | jq -c --argjson base "$BASE" \
+  '$base + {agent_reports: .}' \
+  | jq -c --slurpfile m <(echo "$METRICS") '. + {
+    model: ($m[0].model // null),
+    token_usage: ($m[0].token_usage // null),
+    estimated_cost_usd: ($m[0].estimated_cost_usd // null),
+    compactions: ($m[0].compactions // {count: 0, events: []})
   }' > "$SUMMARY_FILE"
 
 # Extract agent_report, plan_snapshot, and compaction events to dev_record (project artifacts)

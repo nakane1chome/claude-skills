@@ -49,6 +49,10 @@ E2E tests validate skills and plugins against real Claude sessions across model 
 - `make test` runs skill tests across model tiers; `make test-fw` runs framework unit tests; `make test-all` runs both
 - CI: `.github/workflows/e2e-tests.yml` publishes HTML reports to GitHub Pages
 
+## Test Failures
+
+**Every test failure is a real bug. Fix it.** There is no such thing as a "pre-existing failure," a "known flaky test," or an "unrelated issue." If a test fails, it is broken and you must fix it before moving on. Do not dismiss, skip, or rationalize away any failure. Do not label failures as "pre-existing" to avoid responsibility. If you broke it, fix it. If it was already broken, fix it anyway — you are looking at it now and that makes it your problem.
+
 ## Conventions
 
 - Document curation skills use a **stop-after-each-stage** pattern — the agent pauses for developer review between stages

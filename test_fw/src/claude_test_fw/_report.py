@@ -50,8 +50,10 @@ class ReportCollector:
         self._model_alias = model_alias
         self._test_file = test_file
         self._sandbox_dir = project_dir.parent.name
-        self._test_name = test_name
-        self._test_description = test_description
+        if test_name is not None:
+            self._test_name = test_name
+        if test_description is not None:
+            self._test_description = test_description
 
         # Auto-derive skill under test from test file path:
         # tests/skills/<skill-name>/test_*.py → <skill-name>
@@ -122,7 +124,10 @@ class ReportCollector:
         test_dir = self._test_file.resolve().parent.relative_to(
             self._test_file.resolve().parent.parent.parent
         )
-        test_name = self._test_file.stem.removeprefix("test_")
+        raw = self._test_name or self._test_file.stem
+        test_name = raw.removeprefix("test_")
+        # Sanitize parametrize brackets for filesystem safety
+        test_name = test_name.replace("[", "-").replace("]", "")
         reports_dir = self._test_file.resolve().parent.parent.parent / "reports"
         reports_dir.mkdir(exist_ok=True)
         stem = f"{test_dir.as_posix().replace('/', '-')}-{test_name}-{self._model_alias}"
@@ -150,6 +155,16 @@ class ReportCollector:
                 checks=self._checks,
             )
             shutil.copy2(report_path, stable_html)
+
+            # Copy sandbox project files so the report's file-tree links resolve
+            if self._sandbox_dir and self._project_dir.is_dir():
+                sandbox_dest = reports_dir / "sandbox" / self._sandbox_dir
+                if sandbox_dest.exists():
+                    shutil.rmtree(sandbox_dest)
+                shutil.copytree(
+                    self._project_dir, sandbox_dest,
+                    ignore=shutil.ignore_patterns(".git"),
+                )
         else:
             self._write_default_html(stable_html, metrics)
 
@@ -184,6 +199,8 @@ class ReportCollector:
         out = {
             "model": self._model,
             "model_alias": self._model_alias,
+            "skill": self._skill_under_test,
+            "test_name": self._test_name,
             "sessions": sessions_json,
             "totals": totals,
         }

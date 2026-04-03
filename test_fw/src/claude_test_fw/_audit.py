@@ -578,17 +578,18 @@ class AuditHelpers:
                     node = node.setdefault(part, {})
                 node[file_path.name] = f
 
+            from urllib.parse import quote as _urlquote
+
             def _render_tree(node: dict) -> str:
                 items = []
                 entries = sorted(node.keys(), key=lambda k: (isinstance(node[k], str), k))
                 for name in entries:
                     child = node[name]
                     if isinstance(child, str):
-                        display = name.replace(":", "-")
-                        href = sandbox_prefix + child.replace(":", "-")
+                        href = sandbox_prefix + _urlquote(child, safe="/-_.~")
                         items.append(
                             f'<li><a class="file mono" href="{h(href)}">'
-                            f'{h(display)}</a></li>'
+                            f'{h(name)}</a></li>'
                         )
                     else:
                         items.append(
