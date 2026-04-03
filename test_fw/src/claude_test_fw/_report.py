@@ -95,15 +95,29 @@ class ReportCollector:
         """Attach domain-specific metrics under *key*."""
         self._custom[key] = data
 
+    # Difficulty weights for achievement scoring
+    _DIFFICULTY_WEIGHTS = {
+        "expected": 1.0,
+        "challenging": 0.5,
+        "aspirational": 0.25,
+        None: 1.0,
+    }
+
     def check(self, name: str, passed: bool, *,
+              kind: str = "require",
+              difficulty: str | None = None,
               detail: str | None = None,
               session_id: str | None = None,
               phase: str | None = None) -> None:
-        """Record a test checkpoint (assertion result).
+        """Record a test checkpoint.
 
         Args:
             name: Short description of what was checked.
             passed: Whether the check passed.
+            kind: ``"require"`` (abort on fail), ``"expect"`` (fail but continue),
+                  or ``"achieve"`` (quality indicator, weighted by difficulty).
+            difficulty: For achieve checks — ``"expected"``, ``"challenging"``,
+                        or ``"aspirational"``. Ignored for require/expect.
             detail: Optional detail (e.g. actual vs expected).
             session_id: Tie this check to a specific session.
             phase: Tie this check to a named phase.
@@ -111,10 +125,42 @@ class ReportCollector:
         self._checks.append({
             "name": name,
             "passed": passed,
+            "kind": kind,
+            "difficulty": difficulty,
             "detail": detail,
             "session_id": session_id,
             "phase": phase,
         })
+
+    def compute_scores(self) -> dict:
+        """Compute hard pass/fail and achievement percentage from recorded checks."""
+        require = [c for c in self._checks if c.get("kind") == "require"]
+        expect = [c for c in self._checks if c.get("kind") == "expect"]
+        achieve = [c for c in self._checks if c.get("kind") == "achieve"]
+
+        req_passed = sum(1 for c in require if c["passed"])
+        exp_passed = sum(1 for c in expect if c["passed"])
+
+        hard_total = len(require) + len(expect)
+        hard_passed = req_passed + exp_passed
+
+        if achieve:
+            w = self._DIFFICULTY_WEIGHTS
+            w_achieved = sum(w.get(c.get("difficulty"), 1.0)
+                             for c in achieve if c["passed"])
+            w_total = sum(w.get(c.get("difficulty"), 1.0) for c in achieve)
+            achievement_pct = round(100 * w_achieved / w_total, 1) if w_total else 100.0
+        else:
+            achievement_pct = None
+
+        return {
+            "hard_pass": hard_passed == hard_total,
+            "hard_passed": hard_passed,
+            "hard_total": hard_total,
+            "achievement_pct": achievement_pct,
+            "achieve_count": sum(1 for c in achieve if c["passed"]),
+            "achieve_total": len(achieve),
+        }
 
     def finalize(self) -> Path | None:
         if self._project_dir is None or self._test_file is None:
@@ -206,6 +252,8 @@ class ReportCollector:
         }
         if self._custom:
             out["custom"] = dict(self._custom)
+        out["scores"] = self.compute_scores()
+        out["checks"] = self._checks
         return out
 
     def _write_json(self, reports_dir: Path, stem: str, metrics: dict) -> Path:
@@ -218,8 +266,16 @@ class ReportCollector:
         totals = metrics["totals"]
         sessions = metrics["sessions"]
 
+        scores = metrics.get("scores", {})
+        hard_str = "PASS" if scores.get("hard_pass", True) else "FAIL"
+        hard_detail = f"{scores.get('hard_passed', 0)}/{scores.get('hard_total', 0)}"
+        achieve_pct = scores.get("achievement_pct")
+        achieve_str = f" | Achievement: {achieve_pct}%" if achieve_pct is not None else ""
+
         lines = [
             f"## `{alias}` ({totals['duration_s']}s, ${totals['cost_usd']})",
+            "",
+            f"**Hard: {hard_str} ({hard_detail}){achieve_str}**",
             "",
             "| Phase | Turns | In Tokens | Out Tokens | Cost | Duration |",
             "|-------|-------|-----------|------------|------|----------|",
@@ -253,6 +309,8 @@ class ReportCollector:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         sessions = metrics["sessions"]
         totals = metrics["totals"]
+        scores = metrics.get("scores", {})
+        checks = metrics.get("checks", [])
 
         parts: list[str] = []
         parts.append(f"""<!DOCTYPE html>
@@ -274,12 +332,39 @@ class ReportCollector:
   .stat-card {{ background: #f3f4f6; border-radius: 8px; padding: 12px 16px; }}
   .stat-card .label {{ font-size: 12px; color: #6b7280; text-transform: uppercase; }}
   .stat-card .value {{ font-size: 24px; font-weight: 700; }}
+  .scores-banner {{ padding: 16px 20px; border-radius: 8px; margin: 16px 0;
+                    display: flex; gap: 24px; align-items: center; }}
+  .scores-banner.pass {{ background: #f0fdf4; border: 1px solid #86efac; }}
+  .scores-banner.fail {{ background: #fef2f2; border: 1px solid #fca5a5; }}
+  .score-item {{ font-size: 18px; font-weight: 700; }}
+  .score-item.pass {{ color: #16a34a; }}
+  .score-item.fail {{ color: #dc2626; }}
+  .score-item.achieve {{ color: #2563eb; }}
+  .check-kind {{ display: inline-block; padding: 1px 6px; border-radius: 3px;
+                 font-size: 11px; font-weight: 600; color: #fff; }}
+  .kind-require {{ background: #6b7280; }}
+  .kind-expect {{ background: #d97706; }}
+  .kind-achieve {{ background: #7c3aed; }}
+  .difficulty {{ font-size: 11px; color: #9ca3af; margin-left: 4px; }}
 </style></head><body>
 <h1>{h(title)}</h1>
 <p class="meta">Generated: {h(now)}
   | Model: {h(self._model or '?')} ({h(self._model_alias or '?')})
   | Sessions: {len(sessions)}</p>
 """)
+
+        # Scores banner
+        hard_pass = scores.get("hard_pass", True)
+        banner_class = "pass" if hard_pass else "fail"
+        hard_label = "PASS" if hard_pass else "FAIL"
+        hard_detail = f"{scores.get('hard_passed', 0)}/{scores.get('hard_total', 0)}"
+        parts.append(f'<div class="scores-banner {banner_class}">')
+        pf_class = "pass" if hard_pass else "fail"
+        parts.append(f'<span class="score-item {pf_class}">Hard: {hard_label} ({hard_detail})</span>')
+        achieve_pct = scores.get("achievement_pct")
+        if achieve_pct is not None:
+            parts.append(f'<span class="score-item achieve">Achievement: {achieve_pct}%</span>')
+        parts.append('</div>')
 
         parts.append('<div class="stat-grid">')
         parts.append(f'<div class="stat-card"><div class="label">Total Turns</div>'
@@ -314,6 +399,32 @@ class ReportCollector:
             parts.append("<table><tr><th>Metric</th><th>Value</th></tr>")
             for k, v in section_data.items():
                 parts.append(f"<tr><td>{h(str(k))}</td><td class='mono'>{h(str(v))}</td></tr>")
+            parts.append("</table>")
+
+        # Checks table
+        if checks:
+            parts.append("<h2>Checks</h2>")
+            parts.append("<table><tr><th>Status</th><th>Kind</th><th>Check</th>"
+                         "<th>Detail</th></tr>")
+            for c in checks:
+                kind = c.get("kind", "require")
+                passed = c.get("passed", False)
+                if kind == "achieve":
+                    status = "ACHIEVED" if passed else "NOT ACHIEVED"
+                    status_style = 'color:#2563eb' if passed else 'color:#9ca3af'
+                else:
+                    status = "PASS" if passed else "FAIL"
+                    status_style = 'color:#16a34a' if passed else 'color:#dc2626'
+                kind_class = f"kind-{kind}"
+                diff = c.get("difficulty") or ""
+                diff_str = f' <span class="difficulty">[{diff}]</span>' if diff else ""
+                detail_str = h(str(c.get("detail") or ""))
+                parts.append(
+                    f'<tr><td style="{status_style};font-weight:700">{status}</td>'
+                    f'<td><span class="check-kind {kind_class}">{kind}</span>{diff_str}</td>'
+                    f'<td>{h(c["name"])}</td>'
+                    f'<td class="mono">{detail_str}</td></tr>'
+                )
             parts.append("</table>")
 
         parts.append("</body></html>")

@@ -44,10 +44,23 @@ Each component lives in `skills/<name>/` and contains:
 
 E2E tests validate skills and plugins against real Claude sessions across model tiers.
 
-- `test_fw/` — reusable pytest framework (Claude SDK integration, audit inspection, ablation detection)
+- `test_fw/` — reusable pytest framework (Claude SDK integration, audit inspection, ablation detection, test steps)
 - `tests/` — per-skill E2E tests that depend on `test_fw`
 - `make test` runs skill tests across model tiers; `make test-fw` runs framework unit tests; `make test-all` runs both
 - CI: `.github/workflows/e2e-tests.yml` publishes HTML reports to GitHub Pages
+- See `docs/testing.md` for the full test framework guide
+
+### Test Steps
+
+Tests use the `steps` fixture (`TestSteps` class) with three check classes:
+
+| Class | Prefix | On failure | Use when |
+|-------|--------|-----------|----------|
+| **require** | `steps.require_` | Aborts test | Infrastructure prerequisites (session health, no errors) |
+| **expect** | `steps.expect_` | Records FAIL, continues | Prompted deliverables the model was asked to produce |
+| **achieve** | `steps.achieve_` | Records NOT ACHIEVED, continues | Quality/approach indicators, weighted by difficulty |
+
+Every test reports two scores: **Hard: PASS/FAIL** (require + expect) and **Ability: X%** (weighted achieve checks). Difficulty tiers: `expected` (1.0), `challenging` (0.5), `aspirational` (0.25).
 
 ## Test Failures
 

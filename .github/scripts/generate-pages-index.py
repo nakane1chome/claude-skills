@@ -96,6 +96,14 @@ def _metrics_for_stem(all_metrics: list[dict], stem: str) -> dict | None:
     return None
 
 
+def _scores_for_stem(all_metrics: list[dict], stem: str) -> dict | None:
+    """Find scores matching a specific report stem."""
+    for entry in all_metrics:
+        if entry["stem"] == stem:
+            return entry["metrics"].get("scores")
+    return None
+
+
 def _model_id(all_metrics: list[dict]) -> str | None:
     """Extract the actual model ID from metrics data."""
     for entry in all_metrics:
@@ -301,9 +309,22 @@ def generate_index(site_dir: Path) -> None:
                     if report:
                         base = f"runs/{run_id}/{model}"
                         href = f'{base}/{report["filename"]}'
-                        # Find per-test metrics
+                        # Find per-test metrics and scores
                         stem = report["filename"].removesuffix(".html")
                         totals = _metrics_for_stem(mdata["all_metrics"], stem)
+                        scores = _scores_for_stem(mdata["all_metrics"], stem)
+                        scores_str = ""
+                        if scores and scores.get("hard_total", 0) > 0:
+                            hp = scores.get("hard_pass", True)
+                            label = "PASS" if hp else "FAIL"
+                            color = "#16a34a" if hp else "#dc2626"
+                            pct = scores.get("achievement_pct")
+                            pct_str = (f', <span style="color:#2563eb;font-weight:700">'
+                                       f'ABILITY: {pct}%</span>') if pct is not None else ""
+                            scores_str = (
+                                f'<span style="color:{color};font-weight:700">'
+                                f'{label}</span>{pct_str}; '
+                            )
                         metrics_str = ""
                         if totals:
                             cost = f"${totals.get('cost_usd', 0):.4f}"
@@ -311,7 +332,7 @@ def generate_index(site_dir: Path) -> None:
                             turns = f"{totals.get('num_turns', 0)}t"
                             metrics_str = (
                                 f'<span class="metrics">'
-                                f'{cost} &middot; {dur} &middot; {turns}</span>'
+                                f'{scores_str}{cost} &middot; {dur} &middot; {turns}</span>'
                             )
                         parts.append(
                             f'<td class="cell-link">'

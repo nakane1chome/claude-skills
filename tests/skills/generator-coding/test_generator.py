@@ -83,7 +83,7 @@ VARIANTS = {
     indirect=True,
 )
 async def test_library_generator(
-    project_env, sdk, model, model_alias, report, audit,
+    project_env, steps, sdk, model, model_alias, report, audit,
 ):
     """Generator-coding skill vs baseline: SQLite book-library task."""
     project_dir, claude_query = project_env
@@ -103,8 +103,6 @@ async def test_library_generator(
         plan_results = [m for m in plan_messages if isinstance(m, ResultMessage)]
         if plan_results:
             plan_session_id = plan_results[-1].session_id
-            report.check("plan session_id returned", True,
-                         session_id=plan_session_id, phase="Plan")
             report.add(plan_session_id, sdk.metrics(plan_messages), phase="Plan")
         sdk.log_phase("Plan", plan_messages, project_dir)
 
@@ -114,123 +112,69 @@ async def test_library_generator(
     all_messages = conv.messages
     results = [m for m in all_messages if isinstance(m, ResultMessage)]
     result = results[-1] if results else None
-    assert result is not None, "No ResultMessage returned"
-    assert not result.is_error, (
-        f"Session ended with error: {sdk.text(all_messages)[-500:]}"
-    )
+
+    # require_: session must complete — abort if not
+    steps.require_session_ok(all_messages, phase="Implement")
 
     session_id = result.session_id
     label = "with skill" if has_skill else "baseline"
-    report.check("no error", not result.is_error,
-                 session_id=session_id, phase="Implement")
 
-    # ClaudeSDKClient may not trigger SessionEnd hook — finalize manually
+    # Finalize audit and record metrics
     audit.finalize(project_dir, session_id)
-
     report.add(session_id, sdk.metrics(impl_messages), phase="Implement")
     sdk.log_phase(f"Implement ({label})", impl_messages, project_dir)
 
-    # ---- Collect project files ----
+    # ---- Check artifacts ----
+    if has_skill:
+        _check_generator_artifacts(steps, project_dir, session_id)
+    else:
+        _check_baseline_artifacts(steps, project_dir, session_id)
+
+
+# -- Check helpers -------------------------------------------------------------
+
+def _check_generator_artifacts(steps, project_dir, session_id):
+    """With skill: expect DBML + Jinja2, achieve generator quality."""
+    # expect_: prompt asked to use DBML and Jinja2
+    steps.expect_files_exist(project_dir, ["*.dbml"],
+                             session_id=session_id, phase="Artifacts")
+    steps.expect_files_exist(project_dir, ["*.jinja2", "*.j2", "*.jinja"],
+                             session_id=session_id, phase="Artifacts")
+
+    # achieve_: quality of generator approach
     all_files = [
         str(p.relative_to(project_dir))
         for p in project_dir.rglob("*")
         if p.is_file() and ".git" not in p.parts and ".claude" not in p.parts
     ]
-    all_files_lower = [f.lower() for f in all_files]
-    all_files_str = "\n".join(all_files)
-
-    if has_skill:
-        _assert_generator_artifacts(report, session_id, project_dir,
-                                    all_files, all_files_lower, all_files_str)
-    else:
-        _assert_baseline_artifacts(report, session_id,
-                                   all_files, all_files_lower, project_dir)
-
-
-# -- Assertion helpers ---------------------------------------------------------
-
-def _assert_generator_artifacts(report, session_id, project_dir,
-                                all_files, all_files_lower, all_files_str):
-    """With skill: expect DBML + Jinja2 + generator script."""
-    has_dbml = any(f.endswith(".dbml") for f in all_files_lower)
-    report.check("DBML data model present", has_dbml,
-                 session_id=session_id, phase="Artifacts",
-                 detail=f"files: {all_files_str}")
-
-    has_jinja = any(
-        f.endswith(".jinja2") or f.endswith(".j2") or f.endswith(".jinja")
-        for f in all_files_lower
-    )
-    report.check("Jinja2 template present", has_jinja,
-                 session_id=session_id, phase="Artifacts",
-                 detail=f"files: {all_files_str}")
-
     gen_files = [f for f in all_files if re.search(r"gen", f, re.IGNORECASE)]
-    report.check("generator script present", len(gen_files) > 0,
-                 session_id=session_id, phase="Artifacts",
-                 detail=f"generator files: {gen_files}")
+    steps.achieve("generator script present", len(gen_files) > 0,
+                  difficulty="challenging", session_id=session_id, phase="Artifacts",
+                  detail=f"generator files: {gen_files}")
 
     has_library = any("library" in f.lower() for f in all_files)
-    report.check("library output present", has_library,
-                 session_id=session_id, phase="Artifacts",
-                 detail=f"files: {all_files_str}")
+    steps.achieve("library output present", has_library,
+                  difficulty="expected", session_id=session_id, phase="Artifacts")
 
-    jinja_import_found = False
-    for f in project_dir.rglob("*.py"):
-        if ".git" in f.parts or ".claude" in f.parts:
-            continue
-        content = f.read_text(encoding="utf-8", errors="ignore")
-        if "jinja2" in content.lower() or "from jinja" in content.lower():
-            jinja_import_found = True
-            break
-    report.check("Jinja2 used in Python code", jinja_import_found,
-                 session_id=session_id, phase="Artifacts")
-
-    assert has_dbml, (
-        f"Expected a .dbml data model file with generator-coding skill. "
-        f"Files: {all_files}"
-    )
-    assert has_jinja, (
-        f"Expected a .jinja2 template file with generator-coding skill. "
-        f"Files: {all_files}"
-    )
+    steps.achieve_file_contains(project_dir, "*.py", r"jinja2|from jinja",
+                                difficulty="challenging",
+                                flags=re.IGNORECASE,
+                                session_id=session_id, phase="Artifacts")
 
 
-def _assert_baseline_artifacts(report, session_id,
-                                all_files, all_files_lower, project_dir):
-    """Without skill: expect inline SQL, no DBML/templates."""
-    has_library = any("library" in f.lower() and f.endswith(".py") for f in all_files)
-    report.check("library.py present", has_library,
-                 session_id=session_id, phase="Baseline Artifacts",
-                 detail=f"files: {all_files}")
+def _check_baseline_artifacts(steps, project_dir, session_id):
+    """Without skill: expect library.py with inline SQL."""
+    # expect_: prompt asked for library.py
+    steps.expect_files_exist(project_dir, ["library.py"],
+                             session_id=session_id, phase="Artifacts")
+    steps.expect_file_contains(project_dir, "*.py", r"CREATE\s+TABLE",
+                               flags=re.IGNORECASE,
+                               session_id=session_id, phase="Artifacts")
 
-    sql_in_python = False
-    for f in project_dir.rglob("*.py"):
-        if ".git" in f.parts or ".claude" in f.parts:
-            continue
-        content = f.read_text(encoding="utf-8", errors="ignore")
-        if "sqlite3" in content and re.search(r"CREATE\s+TABLE", content, re.IGNORECASE):
-            sql_in_python = True
-            break
-    report.check("inline SQL in Python", sql_in_python,
-                 session_id=session_id, phase="Baseline Artifacts")
-
-    has_dbml = any(f.endswith(".dbml") for f in all_files_lower)
-    has_jinja = any(
-        f.endswith(".jinja2") or f.endswith(".j2") or f.endswith(".jinja")
-        for f in all_files_lower
-    )
-    report.check("no DBML (baseline)", not has_dbml,
-                 session_id=session_id, phase="Baseline Artifacts",
-                 detail="absent as expected" if not has_dbml else "unexpectedly present")
-    report.check("no Jinja2 templates (baseline)", not has_jinja,
-                 session_id=session_id, phase="Baseline Artifacts",
-                 detail="absent as expected" if not has_jinja else "unexpectedly present")
-
-    assert has_library, (
-        f"Expected library.py in baseline output. Files: {all_files}"
-    )
-    assert sql_in_python, (
-        f"Expected inline SQL (CREATE TABLE) with sqlite3 in baseline. "
-        f"Files: {all_files}"
-    )
+    # achieve_: baseline should not have generator artifacts
+    steps.achieve_files_absent(project_dir, ["*.dbml"],
+                               difficulty="expected",
+                               session_id=session_id, phase="Artifacts")
+    steps.achieve_files_absent(project_dir, ["*.jinja2", "*.j2", "*.jinja"],
+                               difficulty="expected",
+                               session_id=session_id, phase="Artifacts")

@@ -40,7 +40,7 @@ Important: Do not fix any pre-existing test failures. Only add the new language 
 """
 
 
-async def test_full_workflow(installed_project, sdk, audit, model, model_alias, request, report):
+async def test_full_workflow(installed_project, steps, sdk, audit, model, model_alias, request, report):
     project_dir, claude_query = installed_project
 
     report.configure(project_dir=project_dir, model=model, model_alias=model_alias,
@@ -56,9 +56,7 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
         permission_mode="plan",
         max_turns=5,
     )
-    plan_session_id = sdk.session_id(plan_messages)
-    assert plan_session_id is not None, "No session_id from plan phase"
-    report.check("session_id returned", True, session_id=plan_session_id, phase="Plan")
+    plan_session_id = steps.require_session_id(plan_messages, phase="Plan")
     session_ids.append(plan_session_id)
     report.add(plan_session_id, sdk.metrics(plan_messages), phase="Plan")
     sdk.log_phase("Plan", plan_messages, project_dir)
@@ -70,27 +68,17 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
         IMPLEMENT_PROMPT,
         max_turns=20,
     )
-    impl_result = sdk.result(impl_messages)
-    assert impl_result is not None, "No ResultMessage from implement phase"
-    assert not impl_result.is_error, (
-        f"Implementation phase ended with error: {sdk.text(impl_messages)[-500:]}"
-    )
+    impl_result = steps.require_session_ok(impl_messages, phase="Implement")
     impl_session_id = impl_result.session_id
-    report.check("no error", not impl_result.is_error, session_id=impl_session_id, phase="Implement")
     session_ids.append(impl_session_id)
     report.add(impl_session_id, sdk.metrics(impl_messages), phase="Implement")
     sdk.log_phase("Implement", impl_messages, project_dir)
 
-    # Verify at least one test file was created
+    # expect_: prompt asked to create test files
     test_files = list(project_dir.glob("**/test_*.py"))
-    report.check("test file created", len(test_files) >= 1,
+    steps.expect("test file created", len(test_files) >= 1,
                  session_id=impl_session_id, phase="Implement",
                  detail=f"found {len(test_files)} test file(s)")
-    assert len(test_files) >= 1, (
-        f"No test_*.py file created during implementation. "
-        f"project_dir={project_dir}, "
-        f"all files: {[str(p.relative_to(project_dir)) for p in project_dir.rglob('*') if p.is_file() and '.git' not in p.parts]}"
-    )
 
     # ------------------------------------------------------------------
     # Phase 2 — External modification (break a test)
@@ -98,7 +86,6 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     modified = False
     for test_file in test_files:
         content = test_file.read_text()
-        # Case-insensitive replacement of "hello world" with "WRONG STRING"
         new_content = re.sub(
             r"hello world", "WRONG STRING", content, flags=re.IGNORECASE
         )
@@ -135,104 +122,72 @@ async def test_full_workflow(installed_project, sdk, audit, model, model_alias, 
     for sid in session_ids:
         all_events.extend(audit.read_ops_events(project_dir, sid))
 
-    event_types = [e["type"] for e in all_events]
-
-    # Assert user_prompt events exist (>= 3, one per phase)
+    # expect_: audit should capture events from all phases
     user_prompts = [e for e in all_events if e["type"] == "user_prompt"]
-    report.check(">= 3 user_prompt events", len(user_prompts) >= 3,
-                 phase="Audit", detail=f"found {len(user_prompts)}")
-    assert len(user_prompts) >= 3, (
-        f"Expected >= 3 user_prompt events across 3 sessions, got {len(user_prompts)}"
-    )
+    steps.expect_min_count(">= 3 user_prompt events", len(user_prompts), 3,
+                           phase="Audit")
 
-    # Assert tool_call events include Write/Edit and Bash
     tool_calls = [e for e in all_events if e["type"] == "tool_call"]
     tool_names = {e["content"]["tool"] for e in tool_calls}
     has_write_or_edit = bool(tool_names & {"Write", "Edit"})
-    report.check("Write or Edit in tool calls", has_write_or_edit,
-                 phase="Audit", detail=f"tools: {', '.join(sorted(tool_names))}")
-    assert has_write_or_edit, (
-        f"Expected Write or Edit in tool calls, got tools: {tool_names}"
-    )
-    report.check("Bash in tool calls", "Bash" in tool_names,
-                 phase="Audit", detail=f"tools: {', '.join(sorted(tool_names))}")
-    assert "Bash" in tool_names, (
-        f"Expected Bash in tool calls (for pytest), got tools: {tool_names}"
-    )
+    steps.expect("Write or Edit in tool calls", has_write_or_edit,
+                 phase="Audit",
+                 detail=f"tools: {', '.join(sorted(tool_names))}")
+    steps.expect("Bash in tool calls", "Bash" in tool_names,
+                 phase="Audit",
+                 detail=f"tools: {', '.join(sorted(tool_names))}")
 
-    # Soft-assert plan_snapshot: ExitPlanMode only fires when the model transitions
-    # from plan to implementation within a single session. With separate query() calls
-    # for plan and implement, the model stays in plan mode until the session ends.
+    # achieve_: plan snapshots depend on model behavior
     plan_snapshots = [e for e in all_events if e["type"] == "plan_snapshot"]
-    report.check("plan_snapshot events", len(plan_snapshots) > 0,
-                 phase="Audit", detail=f"found {len(plan_snapshots)} (soft)")
-    if not plan_snapshots:
-        import warnings
-        warnings.warn(
-            "No plan_snapshot events found. ExitPlanMode requires an in-session "
-            "plan-to-implement transition (not separate query() calls).",
-            stacklevel=1,
-        )
+    steps.achieve("plan_snapshot events", len(plan_snapshots) > 0,
+                  difficulty="challenging", phase="Audit",
+                  detail=f"found {len(plan_snapshots)}")
 
-    # Phase 3 summary should have plan_snapshots == 0 (no plan mode in phase 3)
+    # expect_: phase 3 should have no plan snapshots
     phase3_summary = audit.read_summary(project_dir, extend_session_id)
-    report.check("phase 3: no plan_snapshots", phase3_summary["plan_snapshots"] == 0,
+    steps.expect("phase 3: no plan_snapshots",
+                 phase3_summary["plan_snapshots"] == 0,
                  session_id=extend_session_id, phase="Extend",
                  detail=f"got {phase3_summary['plan_snapshots']}")
-    assert phase3_summary["plan_snapshots"] == 0, (
-        f"Phase 3 should have 0 plan_snapshots, got {phase3_summary['plan_snapshots']}"
-    )
 
-    # Soft-assert: check for agent_report with ignored_prior_failure
-    # This depends on agent behavior, so we use a descriptive message rather than hard fail
+    # achieve_: agent self-reporting (model-dependent behavior)
     agent_reports = [e for e in all_events if e["type"] == "agent_report"]
     ignored_failures = [
         e for e in agent_reports
         if e.get("content", {}).get("event") == "ignored_prior_failure"
     ]
-    report.check("agent_report: ignored_prior_failure", len(ignored_failures) > 0,
-                 phase="Audit",
-                 detail=f"found {len(ignored_failures)} (soft)")
-    if not ignored_failures:
-        import warnings
-        warnings.warn(
-            "No 'ignored_prior_failure' agent_report found. "
-            "This depends on agent self-reporting behavior and is not a hard failure. "
-            f"Agent reports found: {[e.get('content', {}).get('event') for e in agent_reports]}",
-            stacklevel=1,
-        )
+    steps.achieve("agent_report: ignored_prior_failure",
+                  len(ignored_failures) > 0,
+                  difficulty="aspirational", phase="Audit",
+                  detail=f"found {len(ignored_failures)}")
 
-    # ---- Session metrics (token usage, cost, compactions) ----
-    # These are extracted from Claude's native session log at ~/.claude/projects/.
-    # Soft assertions only — the session log may not be accessible in all environments.
+    # achieve_: session metrics (environment-dependent)
     impl_summary = audit.read_summary(project_dir, impl_session_id)
     has_tokens = impl_summary.get("token_usage") is not None
-    report.check("token_usage present", has_tokens,
-                 session_id=impl_session_id, phase="Metrics")
+    steps.achieve("token_usage present", has_tokens,
+                  difficulty="expected",
+                  session_id=impl_session_id, phase="Metrics")
     if has_tokens:
-        report.check("input_tokens > 0",
-                     impl_summary["token_usage"].get("input_tokens", 0) > 0,
-                     session_id=impl_session_id, phase="Metrics",
-                     detail=f'{impl_summary["token_usage"].get("input_tokens", 0):,}')
-        report.check("output_tokens > 0",
-                     impl_summary["token_usage"].get("output_tokens", 0) > 0,
-                     session_id=impl_session_id, phase="Metrics",
-                     detail=f'{impl_summary["token_usage"].get("output_tokens", 0):,}')
-    report.check("model present", impl_summary.get("model") is not None,
-                 session_id=impl_session_id, phase="Metrics",
-                 detail=impl_summary.get("model", "?"))
-    report.check("estimated_cost_usd present",
-                 impl_summary.get("estimated_cost_usd") is not None,
-                 session_id=impl_session_id, phase="Metrics",
-                 detail=f'${impl_summary.get("estimated_cost_usd") or 0:.4f}')
-    report.check("compactions field present",
-                 impl_summary.get("compactions") is not None,
-                 session_id=impl_session_id, phase="Metrics")
-
-    if not has_tokens:
-        import warnings
-        warnings.warn(
-            "token_usage not found in session summary — "
-            "Claude session log may not be accessible in this environment",
-            stacklevel=1,
-        )
+        steps.achieve("input_tokens > 0",
+                      impl_summary["token_usage"].get("input_tokens", 0) > 0,
+                      difficulty="expected",
+                      session_id=impl_session_id, phase="Metrics",
+                      detail=f'{impl_summary["token_usage"].get("input_tokens", 0):,}')
+        steps.achieve("output_tokens > 0",
+                      impl_summary["token_usage"].get("output_tokens", 0) > 0,
+                      difficulty="expected",
+                      session_id=impl_session_id, phase="Metrics",
+                      detail=f'{impl_summary["token_usage"].get("output_tokens", 0):,}')
+    steps.achieve("model present", impl_summary.get("model") is not None,
+                  difficulty="expected",
+                  session_id=impl_session_id, phase="Metrics",
+                  detail=impl_summary.get("model", "?"))
+    steps.achieve("estimated_cost_usd present",
+                  impl_summary.get("estimated_cost_usd") is not None,
+                  difficulty="expected",
+                  session_id=impl_session_id, phase="Metrics",
+                  detail=f'${impl_summary.get("estimated_cost_usd") or 0:.4f}')
+    steps.achieve("compactions field present",
+                  impl_summary.get("compactions") is not None,
+                  difficulty="expected",
+                  session_id=impl_session_id, phase="Metrics")

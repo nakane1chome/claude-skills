@@ -19,3 +19,4 @@ from claude_test_fw._sdk_helpers import sdk  # noqa: F401
 from claude_test_fw._report import report  # noqa: F401
 from claude_test_fw._instrumented import instrumented_project  # noqa: F401
 from claude_test_fw._audit import audit  # noqa: F401
+from claude_test_fw._steps import steps  # noqa: F401
