@@ -37,6 +37,7 @@ Components for recording and auditing agent activity across sessions.
 |-----------|------|---------|
 | [dev-record](skills/dev-record/) | Plugin | Passive session recording — captures plans, human input, agent decisions, and deviations via hooks. Load with `--plugin-dir skills/dev-record` |
 | [review-skill](skills/review-skill/) | Skill | Review a SKILL.md for quality, correctness, and alignment with Claude Code conventions before committing |
+| [no-pre-existing-failures](skills/no-pre-existing-failures/) | Skill | Test accountability policy — all failures belong to the current changeset; commits must include test results |
 
 dev-record produces two tiers of audit data: **project artifacts** (`audit/dev_record/` — session summaries, agent reports, plan snapshots) that you commit to version control, and **operational detail** (`audit/ops_record/` — full event logs) that stays gitignored.
 
