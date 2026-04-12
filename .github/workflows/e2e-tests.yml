@@ -62,6 +62,7 @@ jobs:
         run: |
           pip install ./test_fw
           pip install ./tests
+          pip install mempalace
 
       - name: Run E2E tests
         working-directory: tests

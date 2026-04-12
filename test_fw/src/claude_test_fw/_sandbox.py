@@ -69,7 +69,7 @@ async def sandbox_project(tmp_path, monkeypatch, request):
     install_script = repo_root / "install.sh"
     subprocess.run(
         ["bash", str(install_script)],
-        input="2\na\n",
+        input="2\na\nn\n",
         cwd=project,
         check=True,
         capture_output=True,

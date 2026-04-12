@@ -94,23 +94,24 @@ async def test_full_workflow(installed_project, steps, sdk, audit, model, model_
             modified = True
             break
 
-    assert modified, (
-        "Failed to modify any test file — could not find 'hello world' in test files"
-    )
+    steps.expect("test file contains 'hello world'", modified,
+                 session_id=impl_session_id, phase="Implement",
+                 detail="needed for phase 3 test-breaking scenario")
 
     # ------------------------------------------------------------------
     # Phase 3 — Extend and observe failure
     # ------------------------------------------------------------------
-    extend_messages = await claude_query(
-        EXTEND_PROMPT,
-        max_turns=25,
-    )
-    extend_result = sdk.result(extend_messages)
-    assert extend_result is not None, "No ResultMessage from extend phase"
-    extend_session_id = extend_result.session_id
-    session_ids.append(extend_session_id)
-    report.add(extend_session_id, sdk.metrics(extend_messages), phase="Extend")
-    sdk.log_phase("Extend", extend_messages, project_dir)
+    if modified:
+        extend_messages = await claude_query(
+            EXTEND_PROMPT,
+            max_turns=25,
+        )
+        extend_result = sdk.result(extend_messages)
+        steps.require_session_ok(extend_messages, phase="Extend")
+        extend_session_id = extend_result.session_id
+        session_ids.append(extend_session_id)
+        report.add(extend_session_id, sdk.metrics(extend_messages), phase="Extend")
+        sdk.log_phase("Extend", extend_messages, project_dir)
 
     # ------------------------------------------------------------------
     # Audit verification
@@ -143,12 +144,13 @@ async def test_full_workflow(installed_project, steps, sdk, audit, model, model_
                   difficulty="challenging", phase="Audit",
                   detail=f"found {len(plan_snapshots)}")
 
-    # expect_: phase 3 should have no plan snapshots
-    phase3_summary = audit.read_summary(project_dir, extend_session_id)
-    steps.expect("phase 3: no plan_snapshots",
-                 phase3_summary["plan_snapshots"] == 0,
-                 session_id=extend_session_id, phase="Extend",
-                 detail=f"got {phase3_summary['plan_snapshots']}")
+    # expect_: phase 3 should have no plan snapshots (only if phase 3 ran)
+    if modified:
+        phase3_summary = audit.read_summary(project_dir, extend_session_id)
+        steps.expect("phase 3: no plan_snapshots",
+                     phase3_summary["plan_snapshots"] == 0,
+                     session_id=extend_session_id, phase="Extend",
+                     detail=f"got {phase3_summary['plan_snapshots']}")
 
     # achieve_: agent self-reporting (model-dependent behavior)
     agent_reports = [e for e in all_events if e["type"] == "agent_report"]

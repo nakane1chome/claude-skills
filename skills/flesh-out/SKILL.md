@@ -22,6 +22,7 @@ This skill is for **generative** work on crude/raw content at `$ARGUMENTS` - not
    - Confirm understanding with developer before proceeding
 
 1. **Research and expand** (agent leads with approval)
+   - If mempalace tools are available, search persistent memory first for prior research on the document's key concepts — previously discovered terminology, related references, and findings from past sessions. Use what is already known before searching the web.
    - Web search for external concepts if applicable
    - Find industry terminology for rough ideas
    - Identify related work the developer may want to reference

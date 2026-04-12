@@ -15,6 +15,7 @@ Review the target document(s) at `$ARGUMENTS` against its SDLC lifecycle context
    - What is this document about and where does it sit in the project?
    - Can you identify a document hierarchy (V-model, or project-defined)?
    - If the project defines its own hierarchy, use that; otherwise ask the developer to clarify
+   - If mempalace tools are available, search persistent memory for stored project hierarchy relationships and prior cross-review outcomes for this project
    - Confirm understanding of the document's position before proceeding
 
 1. **Assess completeness** (agent proposes, developer decides)
@@ -29,6 +30,7 @@ Review the target document(s) at `$ARGUMENTS` against its SDLC lifecycle context
    - Is the target document consistent with decisions and constraints in its parent(s)?
    - Are there contradictions or gaps between the target and its parent documents?
    - Does the target document trace back to requirements or decisions in the parent?
+   - If mempalace tools are available, search persistent memory for stored parent-child document relationships and previous consistency findings on these documents
    - Present findings and ask: are any inconsistencies intentional or reflect evolved thinking?
 
 3. **Cross-validate against the right side** (agent critiques, developer discusses)
