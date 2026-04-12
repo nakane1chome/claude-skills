@@ -4,9 +4,10 @@ Runs flesh-out → review-steps → strong-edit → agent-optimize on a document
 with mempalace active, then tests that a fresh session can recall key concepts
 from the document using only persistent memory.
 
-The pipeline sessions populate mempalace via the skills' conditional
-"if mempalace tools are available" instructions. The recall session has no
-access to the document — only mempalace search.
+Three phases:
+1. Pipeline — 4 skills run with mempalace, populating memory
+2. Recall — fresh session with mempalace, queries for domain concepts
+3. Baseline — same prompt without mempalace, proves recall came from memory
 """
 
 import re
@@ -153,10 +154,49 @@ async def test_pipeline_memory_recall(
         )
 
     # expect_: at least 2 of 4 concepts recalled
+    recall_found = found
     steps.expect(
         "recall: >= 2 of 4 concepts found",
-        found >= 2,
+        recall_found >= 2,
         session_id=recall_session_id,
         phase="Recall",
-        detail=f"{found}/4 concepts",
+        detail=f"{recall_found}/4 concepts",
+    )
+
+    # ── Baseline phase (no mempalace) ────────────────────────
+    baseline_messages = await query_fn(
+        RECALL_PROMPT,
+        max_turns=MAX_TURNS_RECALL,
+    )
+
+    steps.require_session_ok(baseline_messages, phase="Baseline")
+    baseline_result = sdk.result(baseline_messages)
+    baseline_session_id = baseline_result.session_id
+
+    report.add(baseline_session_id, sdk.metrics(baseline_messages), phase="Baseline")
+    sdk.log_phase("Baseline", baseline_messages, project_dir)
+
+    baseline_text = sdk.text(baseline_messages)
+
+    # achieve_: check each domain concept in baseline (informational)
+    baseline_found = 0
+    for concept, pattern in RECALL_TERMS.items():
+        matched = bool(re.search(pattern, baseline_text))
+        if matched:
+            baseline_found += 1
+        steps.achieve(
+            f"baseline: {concept}",
+            matched,
+            difficulty="aspirational",
+            phase="Baseline",
+            detail=f"{'found' if matched else 'missing'} without mempalace",
+        )
+
+    # expect_: mempalace recall should outperform baseline
+    steps.expect(
+        "recall found more concepts than baseline",
+        recall_found > baseline_found,
+        session_id=recall_session_id,
+        phase="Baseline",
+        detail=f"recall={recall_found} vs baseline={baseline_found}",
     )
