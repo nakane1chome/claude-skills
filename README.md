@@ -93,12 +93,12 @@ See [`docs/testing.md`](docs/testing.md) for the full guide on choosing check cl
 <!-- BEGIN TEST RESULTS -->
 | Test | Haiku | Ability | Sonnet | Ability | Opus | Ability |
 |------|:---: | :---: | :---: | :---: | :---: | :---:|
-| dev-record/full_workflow | PASS | 31.6% | PASS | 31.6% | PASS | 31.6% |
-| generator-coding/library_generator-baseline | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
-| generator-coding/library_generator-with_skill | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
-| pipeline-memory/pipeline_memory_recall | FAIL | 0.0% | — | — | — | — |
-| review-skill/review_finds_seeded_issues | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
-| review-steps/review_preserves_vocabulary | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| dev-record/full_workflow | PASS (11/11) | 31.6% (2/6) | PASS (11/11) | 31.6% (2/6) | PASS (11/11) | 31.6% (2/6) |
+| generator-coding/library_generator-baseline | PASS (4/4) | 100.0% (2/2) | PASS (4/4) | 100.0% (2/2) | PASS (4/4) | 100.0% (2/2) |
+| generator-coding/library_generator-with_skill | PASS (4/4) | 100.0% (3/3) | PASS (4/4) | 100.0% (3/3) | PASS (4/4) | 100.0% (3/3) |
+| pipeline-memory/pipeline_memory_recall | FAIL (17/19) | 0.0% (0/8) | PASS (19/19) | 50.0% (3/8) | PASS (19/19) | 66.7% (4/8) |
+| review-skill/review_finds_seeded_issues | PASS (4/4) | 100.0% (6/6) | PASS (4/4) | 100.0% (6/6) | PASS (4/4) | 100.0% (6/6) |
+| review-steps/review_preserves_vocabulary | PASS (6/6) | 100.0% (3/3) | PASS (6/6) | 100.0% (3/3) | PASS (6/6) | 100.0% (3/3) |
 <!-- END TEST RESULTS -->
 
 ## Installation
