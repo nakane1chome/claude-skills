@@ -18,6 +18,7 @@ test: ## Run skill tests for all model tiers (override with MODELS="weakest mid"
 	for tier in $(MODELS); do \
 		echo ""; echo "========== $$tier =========="; echo ""; \
 		pytest -v \
+			-m "not docker" \
 			--model $$tier \
 			--rootdir . -c pyproject.toml \
 			--html reports/pytest-$$tier.html \

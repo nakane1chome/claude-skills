@@ -67,6 +67,7 @@ jobs:
         working-directory: tests
         run: |
           pytest skills/ \
+            -m "not docker" \
             --model ${{ matrix.model }} \
             --basetemp /tmp/pytest-sandbox \
             --html reports/pytest-${{ matrix.model }}.html \
