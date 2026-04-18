@@ -34,6 +34,14 @@ The following skills are less developed:
 |-------|----------|
 | [generator-coding](skills/generator-coding/) | Building template-based code generators — data model + templates + helpers producing repetitive interface code (register maps, serialization, schema-driven output) |
 
+## Dev Environment
+
+| Skill | Use When |
+|-------|----------|
+| [sandbox](skills/sandbox/) | Scaffold a Docker YOLO-mode harness into a repo so Claude Code runs in an isolated container with `--dangerously-skip-permissions`, sharing `~/.claude` for session continuity between host and container |
+
+This repo dogfoods the skill — `./run-sandbox.sh --build` at the repo root launches Claude Code in a container with `/workspace` bind-mounted to the checkout. Pytest cache is routed to `.pytest_cache.sandbox/` so host and container test runs don't clobber each other.
+
 ## Traceability
 
 Components for recording and auditing agent activity across sessions.

@@ -1,0 +1,13 @@
+# Python: route pytest cache to a sandbox-only dir so host and container don't
+# clobber each other. Developer can override by unsetting PYTEST_ADDOPTS.
+export PYTEST_ADDOPTS="-o cache_dir=.pytest_cache.sandbox ${PYTEST_ADDOPTS:-}"
+
+# Install any in-workspace editable packages once per container lifetime,
+# guarded by a sentinel file in the agent's home (persisted across runs via
+# the ~/.claude bind-mount's parent dir — no, home is NOT bind-mounted, so
+# this reinstalls on each `docker compose run --rm`, which is fine since pip
+# install is fast when the base image already has the deps).
+if [ -f /workspace/pyproject.toml ] && [ ! -f /home/agent/.editable_installed ]; then
+    gosu agent pip3 install --break-system-packages --user -e /workspace 2>/dev/null || true
+    touch /home/agent/.editable_installed
+fi
