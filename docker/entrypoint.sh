@@ -9,9 +9,6 @@ set -e
 AGENT_UID=$(id -u agent)
 AGENT_GID=$(id -g agent)
 
-# Ensure ~/.local/bin exists (Claude Code expects it for native install)
-gosu agent mkdir -p /home/agent/.local/bin
-
 # Ensure working directories exist
 gosu agent mkdir -p audit/ops_record 2>/dev/null || true
 
