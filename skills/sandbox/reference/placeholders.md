@@ -32,14 +32,14 @@ Stanzas are full blocks of code inserted into a template at a marker line. The m
 
 | Marker | Template | Selection rule | Stanza files |
 |---|---|---|---|
-| `# @@STANZA:DOCKERFILE_LANG@@` | `docker/Dockerfile.tmpl` | language detection (0..2 stanzas) | `python.dockerfile`, `cmake.dockerfile` |
-| `# @@STANZA:ENTRYPOINT_LANG@@` | `docker/entrypoint.sh.tmpl` | language detection (0..2 stanzas) | `python.entrypoint`, `cmake.entrypoint`, `minimal.entrypoint` |
+| `# @@STANZA:DOCKERFILE_LANG@@` | `docker/Dockerfile.tmpl` | language detection (0..3 stanzas) | `python.dockerfile`, `cmake.dockerfile`, `node.dockerfile` |
+| `# @@STANZA:ENTRYPOINT_LANG@@` | `docker/entrypoint.sh.tmpl` | language detection (0..3 stanzas) | `python.entrypoint`, `cmake.entrypoint`, `node.entrypoint`, `minimal.entrypoint` |
 | `# @@STANZA:SAFE_DIRS@@` | `docker/entrypoint.sh.tmpl` | one line per submodule path, or empty | inline (see detection.md) |
-| `# @@STANZA:FRESH_CLEANUP@@` | `run-sandbox.sh.tmpl` | matches build-dir isolation choice | `python.fresh`, `cmake.fresh`, `minimal.fresh` |
+| `# @@STANZA:FRESH_CLEANUP@@` | `run-sandbox.sh.tmpl` | matches build-dir isolation choice | `python.fresh`, `cmake.fresh`, `node.fresh`, `minimal.fresh` |
 
 ### Stanza rules
 
-- If multiple stanzas apply (e.g. a repo is both Python and CMake), concatenate them in the order `cmake` → `python` (CMake toolchain first, since Python pip may depend on compilers) and separate with a blank line.
+- When multiple stanzas apply, concatenate them in the order **cmake → node → python** and separate with a blank line. Reasoning: compilers first so later stages can link native bindings; Node before Python so `pip` lands last (pip wheels sometimes shell out to `npm`-managed tooling during build).
 - If no stanza applies to a marker, **remove the marker line entirely**. Do not leave an empty comment.
 - Stanzas in `stanzas/` are plain text fragments — not templated. Any values they need come from runtime env, not from Stage 1 substitution.
 

@@ -65,7 +65,6 @@ if [[ ${#selected[@]} -eq 0 ]]; then
 fi
 
 # --- Copy skills ---
-sandbox_selected=false
 for skill in "${selected[@]}"; do
   target="$DEST/$skill"
 
@@ -89,39 +88,7 @@ for skill in "${selected[@]}"; do
     echo "  Running $skill project setup..."
     CLAUDE_PROJECT_DIR="$(pwd)" bash "$target/install.sh"
   fi
-
-  [[ "$skill" == "sandbox" ]] && sandbox_selected=true
 done
-
-# --- Sandbox harness (project installs only) ---
-# The sandbox skill is a scaffolder: the *template* goes in .claude/skills/, but
-# the rendered harness (run-sandbox.sh + docker/) lives at the project root.
-# Copying the dogfooded harness saves the developer a round-trip through Claude
-# for a default install. Collisions prompt; global installs skip this entirely.
-if [[ "$dest_choice" == "2" && "$sandbox_selected" == true ]]; then
-  proj_root="$(pwd)"
-  echo ""
-  echo "Installing sandbox harness to $proj_root ..."
-  for item in run-sandbox.sh docker-compose.yml docker; do
-    src="$SCRIPT_DIR/$item"
-    dst="$proj_root/$item"
-    if [[ ! -e "$src" ]]; then
-      echo "  Warning: $item missing from repo root; skipping"
-      continue
-    fi
-    if [[ -e "$dst" ]]; then
-      overwrite=""
-      read -rp "  $item already exists at $dst. Overwrite? [y/N]: " overwrite || true
-      if [[ "$overwrite" != "y" && "$overwrite" != "Y" ]]; then
-        echo "  Skipping $item"
-        continue
-      fi
-      rm -rf "$dst"
-    fi
-    cp -r "$src" "$dst"
-    echo "  Installed $item"
-  done
-fi
 
 echo ""
 echo "Done."
