@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+
 import pytest
 
 
@@ -12,8 +14,20 @@ async def polyglot_target(instrumented_project):
     Drops minimal `pyproject.toml`, `CMakeLists.txt`, and `requirements.txt`
     into the project root so the sandbox skill's language-detection rules
     should select both python and cmake stanzas.
+
+    Also removes any pre-existing harness files that top-level `install.sh`
+    copied in for project installs that include sandbox — the test needs a
+    clean slate so the skill's Stage 0 doesn't trip its collision detection.
     """
     project, query_fn = instrumented_project
+
+    for name in ("run-sandbox.sh", "docker-compose.yml"):
+        f = project / name
+        if f.is_file():
+            f.unlink()
+    docker_dir = project / "docker"
+    if docker_dir.is_dir():
+        shutil.rmtree(docker_dir)
 
     (project / "pyproject.toml").write_text(
         '[project]\nname = "polyglot-example"\nversion = "0.0.0"\n'
