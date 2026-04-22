@@ -10,6 +10,9 @@ dependencies = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "docker: requires a local docker daemon; excluded from default CI runs",
+]
 
 [tool.setuptools]
 packages = []

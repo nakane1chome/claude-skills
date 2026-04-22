@@ -34,6 +34,14 @@ The following skills are less developed:
 |-------|----------|
 | [generator-coding](skills/generator-coding/) | Building template-based code generators — data model + templates + helpers producing repetitive interface code (register maps, serialization, schema-driven output) |
 
+## Dev Environment
+
+| Skill | Use When |
+|-------|----------|
+| [sandbox](skills/sandbox/) | Scaffold a Docker YOLO-mode harness into a repo so Claude Code runs in an isolated container with `--dangerously-skip-permissions`, sharing `~/.claude` for session continuity between host and container |
+
+This repo dogfoods the skill — `./run-sandbox.sh --build` at the repo root launches Claude Code in a container with `/workspace` bind-mounted to the checkout. Pytest cache is routed to `.pytest_cache.sandbox/` so host and container test runs don't clobber each other.
+
 ## Traceability
 
 Components for recording and auditing agent activity across sessions.
@@ -96,8 +104,10 @@ See [`docs/testing.md`](docs/testing.md) for the full guide on choosing check cl
 | dev-record/full_workflow | PASS | 31.6% | PASS | 31.6% | PASS | 31.6% |
 | generator-coding/library_generator-baseline | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
 | generator-coding/library_generator-with_skill | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| pipeline-memory/pipeline_memory_recall | FAIL | 0.0% | PASS | 50.0% | PASS | 66.7% |
 | review-skill/review_finds_seeded_issues | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
 | review-steps/review_preserves_vocabulary | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| sandbox/sandbox_scaffolds_polyglot_target | PASS | 66.7% | — | — | — | — |
 <!-- END TEST RESULTS -->
 
 ## Installation

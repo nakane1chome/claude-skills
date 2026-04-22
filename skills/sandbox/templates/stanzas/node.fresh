@@ -1,0 +1,1 @@
+    rm -rf /home/agent/.npm-sandbox/ 2>/dev/null || true

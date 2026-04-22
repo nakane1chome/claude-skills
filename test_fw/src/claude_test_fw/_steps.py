@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import stat
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -126,6 +128,73 @@ class TestSteps:
             detail=f"got {actual}, need >= {minimum}",
         )
         return passed
+
+    def expect_executable(self, project_dir, patterns, *,
+                          session_id=None, phase="Permissions"):
+        """Files matching any glob should have the user-execute bit set.
+
+        Passes if every file matched by any pattern has ``S_IXUSR``.
+        Fails if any matched file lacks the bit, or if no files match at all.
+        Returns list of (relpath, is_executable) tuples.
+        """
+        project_dir = Path(project_dir)
+        results = []
+        for pat in patterns:
+            for p in project_dir.rglob(pat):
+                if not p.is_file() or ".git" in p.parts or ".claude" in p.parts:
+                    continue
+                mode = p.stat().st_mode
+                results.append((str(p.relative_to(project_dir)),
+                                bool(mode & stat.S_IXUSR)))
+        label = " | ".join(patterns)
+        if not results:
+            passed = False
+            detail = "no files matched"
+        else:
+            non_exec = [r for r, ok in results if not ok]
+            passed = len(non_exec) == 0
+            detail = (f"all {len(results)} executable"
+                      if passed else f"not executable: {non_exec[:5]}")
+        self.report.check(
+            f"executable: {label}", passed,
+            kind="expect", session_id=session_id, phase=phase, detail=detail,
+        )
+        return results
+
+    def expect_shell_syntax_valid(self, project_dir, patterns, *,
+                                  session_id=None, phase="Syntax"):
+        """Shell scripts matching any glob should pass ``bash -n``.
+
+        Passes if every matched script parses without syntax errors.
+        Fails if any matched script fails to parse, or if no files match.
+        Returns list of (relpath, returncode, stderr) tuples.
+        """
+        project_dir = Path(project_dir)
+        results = []
+        for pat in patterns:
+            for p in project_dir.rglob(pat):
+                if not p.is_file() or ".git" in p.parts or ".claude" in p.parts:
+                    continue
+                proc = subprocess.run(
+                    ["bash", "-n", str(p)],
+                    capture_output=True, text=True,
+                )
+                results.append((str(p.relative_to(project_dir)),
+                                proc.returncode, proc.stderr.strip()))
+        label = " | ".join(patterns)
+        if not results:
+            passed = False
+            detail = "no files matched"
+        else:
+            failures = [(r, err) for r, rc, err in results if rc != 0]
+            passed = len(failures) == 0
+            detail = (f"all {len(results)} scripts parse cleanly"
+                      if passed else f"syntax errors: {failures[:3]}")
+        self.report.check(
+            f"shell syntax valid: {label}", passed,
+            kind="expect", session_id=session_id, phase=phase, detail=detail,
+        )
+        return results
 
     # ------------------------------------------------------------------
     # achieve_: quality indicators with difficulty weighting

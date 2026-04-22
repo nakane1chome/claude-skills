@@ -33,6 +33,14 @@ Each component lives in `skills/<name>/` and contains:
 |-------|---------|----------|
 | **generator-coding** | Template-based code generation pattern | Building generators that use data models + templates + helpers to produce repetitive interface code |
 
+## Dev Environment
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| **sandbox** | Scaffold a Docker YOLO-mode harness (`run-sandbox.sh` + `docker/`) into a target repo | Developer wants Claude Code to run in an isolated container with `--dangerously-skip-permissions`, sharing `~/.claude` for session continuity |
+
+This repo dogfoods `sandbox`: `./run-sandbox.sh --build` at the repo root launches Claude Code in a container with `/workspace` bind-mounted to the checkout. Pytest cache is routed to `.pytest_cache.sandbox/` so host and container test runs don't clobber each other.
+
 ## Traceability
 
 | Component | Type | Purpose |
