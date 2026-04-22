@@ -22,36 +22,55 @@ This skill installs a four-file Docker harness into a target repo: `run-sandbox.
 ## Stage 0 — Understand the target repo (agent proposes, developer confirms)
 
 - Resolve the target directory: use `$ARGUMENTS` if set; otherwise default to `$(pwd)`. If `$ARGUMENTS` is set but the path doesn't exist or isn't a directory, stop and ask the user.
-- Detect the repo's build system using the rules in `reference/detection.md`. Summarize: Python (`pyproject.toml`, `requirements.txt`), CMake (`CMakeLists.txt`), both, or neither.
+- Detect the repo's build system using the rules in `reference/detection.md`. Summarize: Python (`pyproject.toml`, `requirements.txt`), CMake (`CMakeLists.txt`), Node/TypeScript (`package.json`), combinations, or none.
 - Check for collisions — does the target already have `run-sandbox.sh`, `docker-compose.yml`, `docker/Dockerfile`, or `docker/entrypoint.sh`? If so, list each and ask the user whether to overwrite, merge, or abort.
 - Check for `.claude/settings.json` in the target — if it contains hardcoded absolute paths (e.g. hook commands using `/home/user/...`), flag this, because the entrypoint's host-path symlink needs to match.
-- Confirm understanding with the developer before proceeding. A wrong language detection at Stage 0 causes the wrong Dockerfile stanza at Stage 2.
+- **Enumerate per-stack concerns that require harness adaptation.** Don't just note them — read the repo well enough to write down the concrete change each concern implies, ready to fold into Stage 1. Examples:
+  - **Dev server / port binding.** If the repo runs a dev server (`npm run serve`, `rails s`, `uvicorn`, `vite`, etc.), identify the port it binds to and what change to make — usually a `ports:` entry in `docker-compose.yml` or a `--network host` note on the launcher.
+  - **Package-manager mismatch.** Lockfile (`pnpm-lock.yaml`, `yarn.lock`, `poetry.lock`, `uv.lock`) that doesn't match the default stanza's installer — plan the Dockerfile edit (`npm install -g pnpm`, `pip install uv`, etc.).
+  - **Pinned toolchain versions.** `.nvmrc`, `.python-version`, `rust-toolchain.toml` — plan to override the stanza's default version.
+  - **Native modules.** Python or Node deps that shell out to gcc / cmake at install time — may need the cmake stanza even in a nominally Python-only repo.
+  - **Workspace installs.** Monorepo with nested `pyproject.toml` / `package.json` — plan for lazy install in the entrypoint.
+- Confirm the detection AND the concern list with the developer before proceeding. Each concern must have a concrete resolution proposal in Stage 1; never leave one as "flagged, over to you".
 
-## Stage 1 — Confirm template variables (agent proposes, developer approves)
+## Stage 1 — Confirm plan (agent proposes, developer approves)
 
-Propose values for each placeholder from `reference/placeholders.md`. Present as a table:
+Present the full plan as two tables. The developer approves/edits both before Stage 2 writes anything.
+
+**Template variables** (from `reference/placeholders.md`):
 
 | Placeholder | Proposed value | Source |
 |---|---|---|
 | `{{REPO_NAME}}` | basename of target dir | e.g. `my-project` |
-| `{{LANG_DOCKERFILE_STANZA}}` | `python` / `cmake` / both / `minimal` | Stage 0 detection |
+| `{{LANG_DOCKERFILE_STANZA}}` | `python` / `cmake` / `node` / combinations / `minimal` | Stage 0 detection |
 | `{{LANG_ENTRYPOINT_STANZA}}` | matches above | Stage 0 detection |
-| `{{BUILD_DIR_ISOLATION}}` | `pytest` / `cmake` / both / none | Developer choice |
+| `{{BUILD_DIR_ISOLATION}}` | `pytest` / `cmake` / `node` / combinations / `none` | Developer choice |
 | `{{EXTRA_SAFE_DIRS}}` | list of git submodule paths | `.gitmodules` in target, or empty |
 | `{{EXTRA_PIP_PACKAGES}}` | extra pip installs | `requirements.txt` presence, or empty |
 
+**Stack-specific adaptations** (one row per Stage 0 concern):
+
+| Concern | Proposed change | File |
+|---|---|---|
+| e.g. Vue dev server binds `localhost:8080` | add `ports: ["8080:8080"]` | `docker-compose.yml` |
+| e.g. repo uses `pnpm` not `npm` | add `RUN npm install -g pnpm` after Node stanza | `docker/Dockerfile` |
+| e.g. `.nvmrc` pins Node 20 | change `ARG NODE_MAJOR=22` to `20` | `docker/Dockerfile` |
+
+Every concern Stage 0 raised must appear in this table with a concrete change — no bare notes. If a concern genuinely can't be resolved automatically, call it out explicitly as "deferred to developer" with a reason, not as a silent gap.
+
 Note: there is intentionally no `{{REPO_PATH}}` or `{{SESSION_DIR_NAME}}` placeholder — both are resolved **at runtime** by the launcher and entrypoint, so the rendered harness is movable between hosts or across clones without re-running the skill.
 
-Developer confirms or edits each value. If the developer overrides the detection, record the reason inline so Stage 2 knows what to do.
+Developer confirms or edits each row. If the developer overrides the detection, record the reason inline so Stage 2 knows what to do.
 
-## Stage 2 — Render and write the harness (agent leads)
+## Stage 2 — Render, adapt, and write the harness (agent leads)
 
 For each of the four template files in `templates/`:
 
 1. Read the `.tmpl` file.
 2. Substitute `{{VAR}}` placeholders with Stage 1 values.
 3. Where the template contains a stanza marker (`# @@STANZA:<name>@@`), splice in the matching file from `templates/stanzas/` — or remove the marker line entirely if the stanza is `minimal` or not selected.
-4. Write the rendered file to the target repo at its final path.
+4. **Apply every stack-specific adaptation approved in Stage 1.** Do not skip any. If the Stage 1 table said "add `ports: ["8080:8080"]`", the rendered `docker-compose.yml` contains that entry. If it said "override `ARG NODE_MAJOR=22` to `20`", the rendered Dockerfile has `20`. The output is not a template with TODOs — it is the finished harness for this repo.
+5. Write the rendered file to the target repo at its final path.
 
 Write order:
 
@@ -60,7 +79,7 @@ Write order:
 - `<target>/docker/Dockerfile`
 - `<target>/docker/entrypoint.sh` — `chmod +x` after writing
 
-If `docker/` doesn't exist in the target, create it. Report the written paths back to the developer.
+If `docker/` doesn't exist in the target, create it. Report the written paths back to the developer, and for each Stage 1 adaptation row, confirm which file it landed in.
 
 ## Stage 3 — Verify end-to-end (agent proposes commands, developer runs)
 
