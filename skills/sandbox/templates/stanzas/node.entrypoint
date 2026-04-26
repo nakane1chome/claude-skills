@@ -1,0 +1,7 @@
+# Node.js: npm cache isolated to /home/agent/.npm-sandbox so host and container
+# don't trample each other's cache (native bindings may differ between host and
+# container Node versions). node_modules/ is intentionally NOT isolated — most
+# JS toolchains assume it lives at the project root; if the target repo pins
+# a node version the developer can run `npm ci` in the entrypoint or manually.
+export NPM_CONFIG_CACHE=/home/agent/.npm-sandbox
+gosu agent mkdir -p "$NPM_CONFIG_CACHE" 2>/dev/null || true

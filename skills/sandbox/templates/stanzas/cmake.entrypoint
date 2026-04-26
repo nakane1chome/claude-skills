@@ -1,0 +1,10 @@
+# CMake: use a sandbox-only build dir so host and container builds coexist.
+export BUILD_DIR=build.sandbox
+gosu agent mkdir -p "$BUILD_DIR"
+
+# Initialize CMake build if not already configured
+if [ -f /workspace/CMakeLists.txt ] && [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
+    echo "Initializing CMake build in $BUILD_DIR..."
+    gosu agent cmake -B "/workspace/$BUILD_DIR" -DCMAKE_BUILD_TYPE=Debug 2>&1 \
+        || echo "CMake init deferred (may need full source tree)"
+fi

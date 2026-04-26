@@ -1,0 +1,19 @@
+services:
+  claude-sandbox:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDE_PROJECT_DIR=/workspace
+      - HOST_REPO_PATH=${HOST_REPO_PATH}
+      - REPO_NAME=${REPO_NAME}
+    volumes:
+      - .:/workspace                                   # project (rw)
+      - ${HOME}/.claude:/home/agent/.claude            # claude config, auth, skills
+      - ${HOME}/.claude.json:/home/agent/.claude.json  # claude main config
+    stdin_open: true
+    tty: true

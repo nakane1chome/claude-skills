@@ -131,3 +131,23 @@ fi
 
 echo ""
 echo "Done."
+
+# --- Post-install: offer to launch Claude for skills that need it ---
+# The sandbox skill scaffolds a harness interactively via Claude. Offer a
+# one-step launch so the developer doesn't have to type `claude` and
+# `/sandbox` by hand. Project installs only; default-yes; skipped silently
+# if `claude` isn't on PATH or stdin doesn't answer.
+if [[ "$dest_choice" == "2" ]] && printf '%s\n' "${selected[@]}" | grep -qx sandbox; then
+  if command -v claude >/dev/null 2>&1; then
+    echo ""
+    launch=""
+    read -rp "Launch Claude now to scaffold the sandbox harness? [Y/n]: " launch || true
+    if [[ "$launch" != "n" && "$launch" != "N" ]]; then
+      exec claude "Use the sandbox skill to scaffold a Docker YOLO-mode harness into the current directory."
+    fi
+  else
+    echo ""
+    echo "Note: install the Claude CLI and run:"
+    echo "  claude \"Use the sandbox skill to scaffold a Docker YOLO-mode harness into the current directory.\""
+  fi
+fi

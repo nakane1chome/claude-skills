@@ -34,6 +34,14 @@ The following skills are less developed:
 |-------|----------|
 | [generator-coding](skills/generator-coding/) | Building template-based code generators — data model + templates + helpers producing repetitive interface code (register maps, serialization, schema-driven output) |
 
+## Dev Environment
+
+| Skill | Use When |
+|-------|----------|
+| [sandbox](skills/sandbox/) | Scaffold a Docker YOLO-mode harness into a repo so Claude Code runs in an isolated container with `--dangerously-skip-permissions`, sharing `~/.claude` for session continuity between host and container |
+
+This repo dogfoods the skill — `./run-sandbox.sh --build` at the repo root launches Claude Code in a container with `/workspace` bind-mounted to the checkout. Pytest cache is routed to `.pytest_cache.sandbox/` so host and container test runs don't clobber each other.
+
 ## Traceability
 
 Components for recording and auditing agent activity across sessions.
@@ -93,12 +101,13 @@ See [`docs/testing.md`](docs/testing.md) for the full guide on choosing check cl
 <!-- BEGIN TEST RESULTS -->
 | Test | Haiku | Ability | Sonnet | Ability | Opus | Ability |
 |------|:---: | :---: | :---: | :---: | :---: | :---:|
-| dev-record/full_workflow | PASS (11/11) | 31.6% (2/6) | PASS (11/11) | 31.6% (2/6) | PASS (11/11) | 31.6% (2/6) |
-| generator-coding/library_generator-baseline | PASS (4/4) | 100.0% (2/2) | PASS (4/4) | 100.0% (2/2) | PASS (4/4) | 100.0% (2/2) |
-| generator-coding/library_generator-with_skill | PASS (4/4) | 100.0% (3/3) | PASS (4/4) | 100.0% (3/3) | PASS (4/4) | 100.0% (3/3) |
-| pipeline-memory/pipeline_memory_recall | FAIL (17/19) | 0.0% (0/8) | PASS (19/19) | 50.0% (3/8) | PASS (19/19) | 66.7% (4/8) |
-| review-skill/review_finds_seeded_issues | PASS (4/4) | 100.0% (6/6) | PASS (4/4) | 100.0% (6/6) | PASS (4/4) | 100.0% (6/6) |
-| review-steps/review_preserves_vocabulary | PASS (6/6) | 100.0% (3/3) | PASS (6/6) | 100.0% (3/3) | PASS (6/6) | 100.0% (3/3) |
+| dev-record/full_workflow | PASS | 31.6% | PASS | 31.6% | PASS | 31.6% |
+| generator-coding/library_generator-baseline | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| generator-coding/library_generator-with_skill | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| pipeline-memory/pipeline_memory_recall | FAIL | 0.0% | PASS | 50.0% | PASS | 66.7% |
+| review-skill/review_finds_seeded_issues | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| review-steps/review_preserves_vocabulary | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| sandbox/sandbox_scaffolds_polyglot_target | PASS | 66.7% | — | — | — | — |
 <!-- END TEST RESULTS -->
 
 ## Installation
