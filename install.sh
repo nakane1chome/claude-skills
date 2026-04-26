@@ -90,6 +90,45 @@ for skill in "${selected[@]}"; do
   fi
 done
 
+# --- Optional: mempalace persistent memory ---
+# Several skills (flesh-out, review-steps, sdlc-cross-review, strong-edit) can
+# optionally use mempalace (https://github.com/milla-jovovich/mempalace) as a
+# persistent cross-session memory backend. Skills degrade gracefully when it
+# isn't installed.
+echo ""
+read -rp "Install mempalace persistent memory system? [y/N]: " mp_choice || true
+if [[ "$mp_choice" == "y" || "$mp_choice" == "Y" ]]; then
+  installed_ok=0
+  if command -v pipx >/dev/null 2>&1; then
+    echo "  Installing mempalace via pipx..."
+    if pipx install mempalace; then installed_ok=1; fi
+  elif command -v pip >/dev/null 2>&1; then
+    echo "  Installing mempalace via pip..."
+    if pip install mempalace; then installed_ok=1; fi
+  else
+    echo "  Error: neither pipx nor pip found." >&2
+    echo "  Install mempalace manually: pip install mempalace" >&2
+  fi
+
+  if [[ "$installed_ok" == "1" ]] && command -v mempalace >/dev/null 2>&1; then
+    if command -v claude >/dev/null 2>&1; then
+      echo "  Registering mempalace MCP server with Claude Code..."
+      claude mcp add mempalace -- python -m mempalace.mcp_server || \
+        echo "  Warning: mempalace MCP server registration failed (may already exist)" >&2
+    else
+      echo "  Warning: claude CLI not found — skipping MCP server registration" >&2
+      echo "  Run manually: claude mcp add mempalace -- python -m mempalace.mcp_server" >&2
+    fi
+
+    if [[ "$dest_choice" == "2" ]]; then
+      read -rp "Initialize mempalace for this project? [y/N]: " mp_init || true
+      if [[ "$mp_init" == "y" || "$mp_init" == "Y" ]]; then
+        mempalace init || echo "  Warning: mempalace init failed" >&2
+      fi
+    fi
+  fi
+fi
+
 echo ""
 echo "Done."
 

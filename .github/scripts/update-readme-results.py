@@ -70,7 +70,11 @@ def _load_test_data(site_dir: Path) -> dict[str, dict[str, dict]]:
 
             results.setdefault(label, {})[alias] = {
                 "hard_pass": scores.get("hard_pass", True),
+                "hard_passed": scores.get("hard_passed", 0),
+                "hard_total": scores.get("hard_total", 0),
                 "achievement_pct": scores.get("achievement_pct"),
+                "achieve_count": scores.get("achieve_count", 0),
+                "achieve_total": scores.get("achieve_total", 0),
                 "cost_usd": totals.get("cost_usd", 0),
                 "duration_s": totals.get("duration_s", 0),
             }
@@ -82,7 +86,10 @@ def _format_hard(data: dict | None) -> str:
     """Format the hard pass/fail cell."""
     if data is None:
         return "—"
-    return "PASS" if data["hard_pass"] else "FAIL"
+    n = data.get("hard_passed", 0)
+    m = data.get("hard_total", 0)
+    label = "PASS" if data["hard_pass"] else "FAIL"
+    return f"{label} ({n}/{m})"
 
 
 def _format_ability(data: dict | None) -> str:
@@ -92,7 +99,9 @@ def _format_ability(data: dict | None) -> str:
     pct = data.get("achievement_pct")
     if pct is None:
         return "—"
-    return f"{pct}%"
+    n = data.get("achieve_count", 0)
+    m = data.get("achieve_total", 0)
+    return f"{pct}% ({n}/{m})"
 
 
 def generate_table(site_dir: Path) -> str:

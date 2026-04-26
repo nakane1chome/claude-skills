@@ -39,9 +39,11 @@ This skill is for **polishing** existing documents at `$ARGUMENTS` — not gener
    - Do other documents in the same folder or project follow a defined structure?
    - Does this document conform to that structure, or deviate for good reason?
    - Are there missing sections that the structure expects?
+   - If mempalace tools are available, search persistent memory for structural patterns from similar documents in past sessions — this catches conventions that aren't visible in the current folder.
    - Ask: are structural deviations intentional?
 
 4. **Review vs industry best practice** (agent assists, developer leads)
+   - If mempalace tools are available, search persistent memory for prior best-practice research in this domain — use cached findings from past sessions before doing new web searches.
    - Web search for relevant frameworks and approaches in this domain
    - How does this document compare against industry patterns?
    - Are there gaps, missing considerations, or areas for improvement?
@@ -60,6 +62,7 @@ This skill is for **polishing** existing documents at `$ARGUMENTS` — not gener
    - Flag any URL that fails or any claim that doesn't match its source
    - Present a verification table: URL | status | source (human/agent) | notes
    - Developer decides what to fix, replace, or remove
+   - If mempalace tools are available, store the verification results (URL status, source, claim validity) so future reviews can skip re-checking known-stable links
 
 > **Why this stage exists**: Agent-sourced references can be fabricated. A hallucinated URL with a plausible domain name will survive every other stage because reviewers (human and agent) evaluate structure, argument, and voice, not link targets. Verification must be an explicit step, not assumed.
 

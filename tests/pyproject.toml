@@ -6,6 +6,7 @@ license = "Unlicense"
 requires-python = ">=3.10"
 dependencies = [
     "claude-test-fw",
+    "mempalace",
 ]
 
 [tool.pytest.ini_options]

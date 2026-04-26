@@ -127,6 +127,8 @@ cp -r skills/review-steps ~/.claude/skills/
 claude --plugin-dir /path/to/claude-skills/skills/dev-record
 ```
 
+The interactive installer also offers to install [mempalace](https://github.com/milla-jovovich/mempalace) — a persistent cross-session memory backend. When present, the document curation skills (flesh-out, review-steps, sdlc-cross-review, strong-edit) will search persistent memory for prior research, structural patterns, and critique findings before re-doing work. Skills degrade gracefully when mempalace is not installed.
+
 ## Authoring Skills
 
 See [AUTHORING.md](AUTHORING.md) for conventions on writing new skills — directory layout, frontmatter fields, the stop-after-each-stage pattern, and description best practices.
@@ -135,6 +137,7 @@ See [AUTHORING.md](AUTHORING.md) for conventions on writing new skills — direc
 
 - [claude-devtools](https://www.claude-dev.tools/) — free desktop app that visualizes Claude Code session logs from `~/.claude/`. Provides token attribution, tool call inspection, subagent trees, and notification triggers. Complementary to dev-record: claude-devtools gives you rich visual replay of *what happened*; dev-record captures *agent intent* (plans, deviations, scope creep) and produces committable audit artifacts that claude-devtools doesn't
 - [Awesome Claude Code](https://github.com/hesreallyhim/awesome-claude-code) — curated list of Claude Code skills, hooks, commands, and tools
+- [mempalace](https://github.com/milla-jovovich/mempalace) — memory palace for Claude Code
 - [Claude Skill: Document Review Pipeline](https://www.shincbm.com/agentic-code/2026/02/15/claude-skill-document-review.html) — blog post on the design of these skills
 
 ## License
