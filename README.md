@@ -28,6 +28,14 @@ The following skills are less developed:
 | [agent-optimize](skills/agent-optimize/) | Verbose prose that AI agents will need to parse — restructures for efficient machine consumption |
 | [sdlc-cross-review](skills/sdlc-cross-review/) | A document that should align with its parent spec — completeness and consistency checking via V-model cross-validation |
 
+## Project Structure
+
+| Skill | Use When |
+|-------|----------|
+| [light-v-structure](skills/light-v-structure/) | Organizing a project's documentation hierarchy around a V-model — scaffold the canonical `docs/` tree (paradigm, ADR, arch, design, test), audit traceability between cross-validation pairs, and keep planning and decision-making aligned to upstream sources of truth |
+
+This skill treats the V-model as a tri-axis gradient rather than a waterfall — stage boundaries are bidirectional and it does not enforce stage-gate sequencing. It pairs with [sdlc-cross-review](skills/sdlc-cross-review/): use `light-v-structure` for project-level structural audits (are the right files present, do V-model pairs exist), and `sdlc-cross-review` for document-level review (does this specific document satisfy its SDLC context).
+
 ## Code Generation
 
 | Skill | Use When |
@@ -107,7 +115,7 @@ See [`docs/testing.md`](docs/testing.md) for the full guide on choosing check cl
 | pipeline-memory/pipeline_memory_recall | FAIL | 0.0% | PASS | 50.0% | PASS | 66.7% |
 | review-skill/review_finds_seeded_issues | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
 | review-steps/review_preserves_vocabulary | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
-| sandbox/sandbox_scaffolds_polyglot_target | PASS | 66.7% | — | — | — | — |
+| sandbox/sandbox_scaffolds_polyglot_target | PASS | 100.0% | — | — | — | — |
 <!-- END TEST RESULTS -->
 
 ## Installation
