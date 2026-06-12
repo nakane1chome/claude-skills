@@ -112,10 +112,12 @@ See [`docs/testing.md`](docs/testing.md) for the full guide on choosing check cl
 | dev-record/full_workflow | PASS | 31.6% | PASS | 31.6% | PASS | 31.6% |
 | generator-coding/library_generator-baseline | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
 | generator-coding/library_generator-with_skill | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| light-v-structure/scaffold_creates_canonical_structure-empty | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
+| light-v-structure/scaffold_creates_canonical_structure-partial | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
 | pipeline-memory/pipeline_memory_recall | FAIL | 0.0% | PASS | 50.0% | PASS | 66.7% |
 | review-skill/review_finds_seeded_issues | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
 | review-steps/review_preserves_vocabulary | PASS | 100.0% | PASS | 100.0% | PASS | 100.0% |
-| sandbox/sandbox_scaffolds_polyglot_target | PASS | 100.0% | — | — | — | — |
+| sandbox/sandbox_scaffolds_polyglot_target | PASS | 100.0% | — | — | PASS | 33.3% |
 <!-- END TEST RESULTS -->
 
 ## Installation
