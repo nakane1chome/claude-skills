@@ -144,6 +144,7 @@ Explain V-model concepts, project conventions, or increment strategies in the co
 | [responsibilities.md](responsibilities.md) | Agent vs developer ownership matrix |
 | [glossary.md](glossary.md) | Terms used in this skill |
 | [references.md](references.md) | External resources and specifications |
+| [sdd.md](sdd.md) | Relationship to Spec-Driven Development — points of difference |
 
 ## Skill Precedence
 
