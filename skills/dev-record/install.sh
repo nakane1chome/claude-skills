@@ -7,6 +7,31 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 
+# dev-record's hooks and this installer's own settings.json edit rely on jq.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "dev-record requires 'jq', which is not installed."
+  if command -v apt-get >/dev/null 2>&1; then
+    install=""
+    read -rp "Install jq now via apt-get? [Y/n]: " install || true
+    if [[ "$install" == "n" || "$install" == "N" ]]; then
+      echo "Aborting: install jq manually (e.g. 'sudo apt-get install jq') and re-run this script." >&2
+      exit 1
+    fi
+    if [[ "$EUID" -eq 0 ]]; then
+      apt-get update && apt-get install -y jq
+    else
+      sudo apt-get update && sudo apt-get install -y jq
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+      echo "jq install failed. Install it manually and re-run this script." >&2
+      exit 1
+    fi
+  else
+    echo "apt-get not found. Install jq manually (e.g. 'brew install jq') and re-run this script." >&2
+    exit 1
+  fi
+fi
+
 echo "Setting up dev-record in $PROJECT_DIR"
 
 # Add audit/ops_record/ to .gitignore
