@@ -270,7 +270,12 @@ class ReportCollector:
         hard_str = "PASS" if scores.get("hard_pass", True) else "FAIL"
         hard_detail = f"{scores.get('hard_passed', 0)}/{scores.get('hard_total', 0)}"
         achieve_pct = scores.get("achievement_pct")
-        achieve_str = f" | Achievement: {achieve_pct}%" if achieve_pct is not None else ""
+        if achieve_pct is not None:
+            ach_n = scores.get("achieve_count", 0)
+            ach_m = scores.get("achieve_total", 0)
+            achieve_str = f" | Achievement: {achieve_pct}% ({ach_n}/{ach_m})"
+        else:
+            achieve_str = ""
 
         lines = [
             f"## `{alias}` ({totals['duration_s']}s, ${totals['cost_usd']})",
@@ -363,7 +368,9 @@ class ReportCollector:
         parts.append(f'<span class="score-item {pf_class}">Hard: {hard_label} ({hard_detail})</span>')
         achieve_pct = scores.get("achievement_pct")
         if achieve_pct is not None:
-            parts.append(f'<span class="score-item achieve">Achievement: {achieve_pct}%</span>')
+            ach_n = scores.get("achieve_count", 0)
+            ach_m = scores.get("achieve_total", 0)
+            parts.append(f'<span class="score-item achieve">Achievement: {achieve_pct}% ({ach_n}/{ach_m})</span>')
         parts.append('</div>')
 
         parts.append('<div class="stat-grid">')
@@ -451,6 +458,18 @@ def report(request):
     if path:
         skill = collector._skill_under_test or "?"
         print(f"\n[{skill}] Report: {path}")
+
+    # Fail the pytest test if any expect_ checks failed
+    failed_expects = [
+        c for c in collector._checks
+        if c.get("kind") == "expect" and not c["passed"]
+    ]
+    if failed_expects:
+        names = [c["name"] for c in failed_expects]
+        pytest.fail(
+            f"{len(failed_expects)} expect check(s) failed: {', '.join(names)}",
+            pytrace=False,
+        )
 
 
 @pytest.hookimpl(hookwrapper=True)

@@ -217,6 +217,12 @@ All scripts require `jq`. Each script exits 0 (non-blocking) and appends to JSON
 
 Hook paths are resolved at install time and written as absolute paths in `.claude/settings.json`. If you move the plugin directory, re-run `setup` to update the paths.
 
+### Mempalace Integration (Optional)
+
+If [mempalace](https://github.com/milla-jovovich/mempalace) is installed (via the repo's `install.sh`), session summaries and agent reports in `audit/dev_record/` become candidates for mining into persistent memory. Once mined, other skills (flesh-out, review-steps, sdlc-cross-review, strong-edit) can retrieve prior session decisions, deviations, and findings via mempalace's MCP tools.
+
+To mine session data manually after a session: `mempalace mine audit/dev_record/`. Dev-record and mempalace are decoupled — either works without the other.
+
 ## When to Use This vs Other Tools
 
 | Goal | Use |

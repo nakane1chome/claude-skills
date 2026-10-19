@@ -13,7 +13,7 @@ test-fw: ## Run framework unit tests
 	cd test_fw && pip install -e . && pytest tests/ -v
 
 test: ## Run skill tests for all model tiers (override with MODELS="weakest mid")
-	cd tests && pip install -e ../test_fw && pip install -e . && \
+	cd tests && pip install -e ../test_fw && pip install -e . && pip install mempalace && \
 	fail=0; \
 	for tier in $(MODELS); do \
 		echo ""; echo "========== $$tier =========="; echo ""; \

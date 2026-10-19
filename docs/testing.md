@@ -103,3 +103,52 @@ These appear in:
 | Baseline has no skill artifacts | `achieve_` | Approach purity — nice to confirm |
 | Audit events exist | `expect_` | The instrumentation should capture data |
 | Token metrics present | `achieve_` | Environment-dependent — not always available |
+
+
+## MCP Servers in Tests
+
+Tests can optionally inject MCP servers into Claude sessions. The framework provides two mechanisms: a marker for arbitrary servers and a convenience fixture for mempalace.
+
+### Using the marker
+
+Declare MCP servers a test requires with `@pytest.mark.mcp`. Tests are automatically skipped if any declared server is unavailable (command not on PATH or module not installed).
+
+```python
+@pytest.mark.mcp(servers={
+    "myserver": {"command": "python", "args": ["-m", "myserver"]},
+})
+async def test_with_custom_mcp(instrumented_project, mcp_servers, steps):
+    project, query_fn = instrumented_project
+    msgs = await query_fn("do something", mcp_servers=mcp_servers)
+```
+
+The `mcp_servers` fixture reads the marker and returns the dict, ready to pass as an override to `query_fn` or `query_fn.conversation()`. For mempalace specifically, prefer the `mempalace_mcp` fixture which handles data isolation automatically.
+
+### Mempalace convenience fixture
+
+For the common case of mempalace, use the `mempalace_mcp` fixture directly — no marker needed:
+
+```python
+async def test_with_mempalace(instrumented_project, mempalace_mcp, steps):
+    project, query_fn = instrumented_project
+    msgs = await query_fn("do work", mcp_servers=mempalace_mcp)
+```
+
+Skips automatically if mempalace is not installed. Each test gets its own isolated ChromaDB and knowledge graph in `tmp_path/mempalace/`.
+
+### Adding other MCP servers
+
+To add a new convenience fixture for another MCP server:
+
+1. Define a config builder in `_mcp.py` (follow the `_mempalace_config()` pattern)
+2. Add a fixture that checks availability and returns the config
+3. Register the fixture in `plugin.py`
+4. If the server has persistent state, point it at `tmp_path` for isolation
+
+### Server lifecycle and isolation
+
+**Transport:** MCP servers use stdio (stdin/stdout pipes) — no ports, no conflicts. The Claude SDK spawns a fresh server process per session. Each `query_fn()` call or `conversation()` context manager creates a new session, so servers start and stop automatically. No manual cleanup is needed.
+
+**Data isolation:** The `mempalace_mcp` fixture points the server at `tmp_path/mempalace/` via the `--palace` CLI flag. Each test gets its own ChromaDB database and SQLite knowledge graph. Tests never share memory state.
+
+**Config isolation:** The test sandbox uses `setting_sources=["project"]`, which excludes user-level MCP servers from `~/.claude/settings.json`. Only servers explicitly passed via the `mcp_servers` override are available. The host system's MCP configuration does not leak into tests.

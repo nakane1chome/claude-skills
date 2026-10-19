@@ -46,6 +46,7 @@ This skill is for **critical evaluation** of `$ARGUMENTS` - not polish (review-s
    - Are counterarguments acknowledged where needed?
    - Is the argument differentiated from obvious alternatives?
    - Would the argument, as presented, achieve the document's goal?
+   - If mempalace tools are available, search persistent memory for prior critique patterns and recurring argument weaknesses identified in similar document types
    - Ask: does the developer have evidence or context that addresses these challenges?
 
 4. **Evaluate readability** (agent critiques, developer discusses)
