@@ -27,6 +27,12 @@ Each component lives in `skills/<name>/` and contains:
 | **agent-optimize** | Optimize docs for AI agent consumption | Verbose prose that agents will need to parse |
 | **sdlc-cross-review** | Completeness + parent document consistency via V-model | Document that needs checking against its SDLC hierarchy |
 
+## Project Structure
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| **light-v-structure** | V-model project structure conventions — scaffold the canonical `docs/` tree, audit traceability, and guide planning/decision-making | Organizing a project's documentation hierarchy (paradigm, ADR, arch, design, test), or keeping planning work aligned to V-model cross-validation pairs |
+
 ## Code Generation
 
 | Skill | Purpose | Use When |

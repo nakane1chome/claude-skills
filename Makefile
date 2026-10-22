@@ -1,5 +1,6 @@
 SITE_DIR := site
 MODELS ?= weakest mid strongest
+TESTS ?= skills/
 
 .PHONY: help install test test-weak test-mid test-strong test-fw test-all open clean
 
@@ -12,7 +13,7 @@ install: ## Install skills interactively
 test-fw: ## Run framework unit tests
 	cd test_fw && pip install -e . && pytest tests/ -v
 
-test: ## Run skill tests for all model tiers (override with MODELS="weakest mid")
+test: ## Run skill tests (override MODELS="..." or TESTS=skills/foo/ — TESTS path is relative to tests/)
 	cd tests && pip install -e ../test_fw && pip install -e . && \
 	fail=0; \
 	for tier in $(MODELS); do \
@@ -23,7 +24,7 @@ test: ## Run skill tests for all model tiers (override with MODELS="weakest mid"
 			--rootdir . -c pyproject.toml \
 			--html reports/pytest-$$tier.html \
 			--self-contained-html \
-			skills/ \
+			$(TESTS) \
 		|| fail=1; \
 		mkdir -p $(CURDIR)/$(SITE_DIR)/runs/local/$$tier; \
 		cp reports/*-$$tier.html reports/*-$$tier.json \
