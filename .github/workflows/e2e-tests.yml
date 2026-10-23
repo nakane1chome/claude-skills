@@ -117,7 +117,8 @@ jobs:
 
   deploy:
     needs: test
-    if: always()
+    # Only main may publish to Pages and push to the pages-history branch.
+    if: always() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -129,8 +130,27 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Restore site history
-        id: cache-restore
+      # Accumulated run history lives on the orphan branch pages-history,
+      # checked out as a worktree at site/ (reuses checkout's credentials).
+      - name: Check out site history
+        id: history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          if git fetch --depth 1 origin pages-history:pages-history; then
+            git worktree add site pages-history
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            git worktree add --detach site
+            git -C site checkout --orphan pages-history
+            git -C site rm -rfq .
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # One-time migration: seed a new pages-history branch from the old
+      # Actions cache. Remove once pages-history exists on the remote.
+      - name: Seed history from legacy cache
+        if: steps.history.outputs.exists == 'false'
         uses: actions/cache/restore@v4
         with:
           path: site
@@ -207,10 +227,11 @@ jobs:
           file_pattern: README.md
 
       - name: Save site history
-        uses: actions/cache/save@v4
-        with:
-          path: site
-          key: pages-site-${{ github.run_id }}
+        working-directory: site
+        run: |
+          git add -A
+          git commit -qm "Add E2E run ${{ github.run_id }} [skip ci]" || echo "No site changes to commit"
+          git push origin pages-history
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
