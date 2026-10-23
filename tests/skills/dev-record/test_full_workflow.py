@@ -54,7 +54,9 @@ async def test_full_workflow(installed_project, steps, sdk, audit, model, model_
     plan_messages = await claude_query(
         PLAN_PROMPT,
         permission_mode="plan",
-        max_turns=5,
+        # Plan mode now spends turns on Explore/Plan subagents and a ToolSearch
+        # to load ExitPlanMode, so 5 is no longer enough.
+        max_turns=12,
     )
     plan_session_id = steps.require_session_id(plan_messages, phase="Plan")
     session_ids.append(plan_session_id)

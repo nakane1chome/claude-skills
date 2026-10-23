@@ -164,7 +164,9 @@ echo "$AGENT_REPORTS" | jq -c --argjson base "$BASE" \
     token_usage: ($m[0].token_usage // null),
     estimated_cost_usd: ($m[0].estimated_cost_usd // null),
     compactions: ($m[0].compactions // {count: 0, events: []})
-  }' > "$SUMMARY_FILE"
+  }' > "$SUMMARY_FILE.tmp.$$"
+# Rename into place so a cancelled hook never leaves a truncated summary.
+mv -f "$SUMMARY_FILE.tmp.$$" "$SUMMARY_FILE"
 
 # Extract agent_report, plan_snapshot, and compaction events to dev_record (project artifacts)
 jq -c 'select(.type == "agent_report" or .type == "plan_snapshot" or .type == "compaction")' "$LOG_FILE" \

@@ -39,7 +39,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/finalize-session.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/finalize-session.sh\"",
+            "timeout": 30
           }
         ]
       }

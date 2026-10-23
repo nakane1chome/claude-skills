@@ -119,7 +119,7 @@ else
       {"matcher": ".*", "hooks": [{"type": "command", "command": ("bash \"" + $hd + "/record-tool-result.sh\"")}]}
     ] |
     .hooks.SessionEnd |= (. // []) + [
-      {"matcher": "", "hooks": [{"type": "command", "command": ("bash \"" + $hd + "/finalize-session.sh\"")}]}
+      {"matcher": "", "hooks": [{"type": "command", "command": ("bash \"" + $hd + "/finalize-session.sh\""), "timeout": 30}]}
     ]
   ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
   echo "  Registered hooks in .claude/settings.json (hooks dir: $HOOKS_DIR)"
